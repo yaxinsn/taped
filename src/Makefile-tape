@@ -1,0 +1,39 @@
+
+
+
+CC=arm-linux-gnueabihf-gcc
+
+TARGET_DIR=../../rundir
+STAGING_DIR=../
+
+progam_src =   main.c  sniffer_sip.c  upload.c config.c
+progam_obj =  $(progam_src:.c=.o)
+lib_src =  linux-utils.c  log.c  sniffer_lib.c  thread_msg_engine.c  wake_utils.c json.c
+lib_obj =  $(lib_src:.c=.o)
+
+all_src = $(progam_src) $(lib_src)
+CFLAGS += -Wall -Werror -Wno-unused-result -Wno-discarded-qualifiers
+#CFLAGS +=  -Wno-deprecated-declarations -Wextra -Wwrite-strings -Wno-unused-parameter -std=gnu99 -D_GNU_SOURCE -D_REEN^CANT -g -O2
+CFLAGS +=-I$(TARGET_DIR)/usr/include  -I./
+CFLAGS += -I./ -I./libs/ 
+
+LDFLAGS = -L$(TARGET_DIR)/usr/lib/ -ljson-c
+vpath %.c ./libs
+vpath %.h ./libs
+
+all: main
+LIB=./json-c/.libs/libjson-c.so
+
+
+$(all_src:.c=.o): %.o : %.c
+	$(CC) $(CFLAGS)  $^ -c -o $@
+
+
+main: $(progam_obj) $(lib_obj)
+#	$(CC) $(LDFLAGS) -Wl,-rpath=./  -L./json-c/.libs  -ljson-c $^ $(LIB) -o $@ 
+	$(CC) $(LDFLAGS) -Wl,-rpath=./  $(CFLAGS) $^ $(LIB) -o $@ 
+#	$(CC) $(LDFLAGS) -Wl,-rpath=./  $^ -o $@ -L./ ./json-c/.libs/libjson-c.so
+
+
+clean:
+	rm main *.o -f
