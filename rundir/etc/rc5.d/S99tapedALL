@@ -1,0 +1,15 @@
+#!/bin/sh
+
+
+case "$1" in
+    start)
+	echo "Start tapedALL " >> /home/root/tapedALL.log
+	/home/root/rundir/init.sh &
+	echo "."
+	;;
+    *)
+	echo "$1 " >> /home/root/tapedALL.log
+	exit 1;
+esac
+
+exit 0

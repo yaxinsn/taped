@@ -1,0 +1,1 @@
+ export QUERY_STRING=1; export REQUEST_METHOD=POST export CONTENT_LENGTH="200" ; echo '{"a":"OK"}' |  lua hostip.cgi
