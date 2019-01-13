@@ -1,0 +1,55 @@
+#!/usr/bin/lua
+local cjson = require("cjson");
+dofile("./lib/log.lua");
+
+--lib
+
+function json_http_resp(j_obj)
+	print('Content-Type: application/json\r\n\r\n') 
+	local jsonStr = cjson.encode(j_obj)
+	print(jsonStr)
+--	os.exit()
+end
+--lib end
+--
+
+--main
+--
+    post_data = {};
+    my_log("QUERY_STRING: " ..  os.getenv("QUERY_STRING") .. "\n");   
+    my_log("content-length: " ..  os.getenv("CONTENT_LENGTH") .. "\n");   
+    post_length = tonumber(os.getenv("CONTENT_LENGTH")) or 0;
+    my_log("method:" ..  os.getenv("REQUEST_METHOD") .. "---------");
+if os.getenv("REQUEST_METHOD") == "POST" then
+	 my_log("POST method\n");
+	if post_length > 0 then 
+		my_log("read post data");
+		post_raw = io.read(post_length);
+		
+		my_log("posw_raw:\n" .. post_raw .. "\n");
+		my_log("posw_raw:\n" .. post_raw .. "\n");
+	end
+
+	json_data = {};
+	http_data = {};
+	json_data["STATUS"] = "OK"
+json_data["msg"] = " success"
+	json_http_resp(json_data);
+	my_log("-POST-is end");
+else
+
+	json_data = {};
+	http_data = {};
+	json_data["STATUS"] = "OK"
+--json_data["msg"] = "get csip success"
+	http_data["IP"] = "2.2.2.3"
+	http_data["MAC"] = "00:11:22:33:44:55"
+	http_data["GATEWAY"] = "2.2.2.1"
+	http_data["NETMASK"] = "255.0.0.0"
+	json_data["DATA"] = http_data;
+	json_http_resp(json_data);
+	my_log("-get-is end");
+end
+
+--main end
+

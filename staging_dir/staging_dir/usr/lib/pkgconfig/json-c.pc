@@ -1,0 +1,11 @@
+prefix=/work/record_voip/rundir/usr
+exec_prefix=/work/record_voip/rundir/usr
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: json-c
+Description: JSON implementation in C
+Version: 0.12
+Requires: 
+Libs:  -L${libdir} -ljson-c
+Cflags: -I${includedir}/json-c

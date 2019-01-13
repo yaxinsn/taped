@@ -1,0 +1,189 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link rel="icon" href="../favicon.ico" type="image/x-icon" />
+    <link rel="shortcun icon" href="../favicon.ico" />
+    <title>测试json</title>
+    <!-- 通过引不同的css实现样式的切换 -->
+    <!--<link rel="stylesheet" type="text/css" href="extjs/resources/ext-theme-classic/ext-theme-classic-all.css">-->
+    <link rel="stylesheet" type="text/css" href="extjs/resources/ext-theme-neptune/ext-theme-neptune-all.css">
+    <link rel="stylesheet" type="text/css" href="extjs/icons/icon.css">
+    <script type="text/javascript" src="extjs/ext-all.js"></script>
+    <script type="text/javascript" src="extjs/locale/ext-lang-zh_CN.js"></script>
+</head>
+<body>
+<script type="text/javascript">
+    /**
+     * Created by qiaochuanbiao on 2017/2/25.
+     */
+
+    Ext.Loader.setConfig({
+        enabled : true
+    });
+
+    //依赖文件
+    Ext.require(['Ext.tip.QuickTipManager',
+        'Ext.window.Window',
+        'Ext.tab.Panel'
+    ]);
+
+    Ext.onReady(function() {
+        // enable the tabTip config below
+        Ext.tip.QuickTipManager.init();
+        Ext.QuickTips.init();
+
+        //form表单
+        var mainForm = Ext.widget("form", {
+            border: false,
+            title: "测试",
+            region:"center",
+            autoScroll: true,
+            collapsible: false,
+            iconCls: "icon-home",
+            // url:"/dashboard/hospital/beijing/BeiDaGuoJi/apps/costaccounting/dept/UpdateOrgnizationInfo",
+            layout: "column",
+            fieldDefaults: {
+                labelAlign: "right",
+                margin: "2 2 2 2"
+            },
+            items: [
+                {
+                    xtype: 'form',
+                    padding: '5 5 0 5',
+                    border: false,
+                    style: 'background-color: #fff;',
+                    layout: 'column',
+                    defaults: {
+                        anchor: '100%'
+                    },
+                    //width: 500,
+                    //height: 100,
+                    fieldDefaults: {
+                        labelAlign: "right",
+//                        labelWidth: 120,
+                        margin: "2 2 2 2",
+                        //width : 325,
+                        labelStyle: "font-weight:bold"
+                    },
+                    items: [
+                        {
+                            xtype: 'fieldset',
+                            collapsible: false,
+                            title: '测试get',
+                            //defaultType: 'textfield',
+                            layout: 'column',
+                            defaults: {
+                                anchor: '100%'
+                            },
+                            items: [
+                                {itemId: "GET_URL",name: "GET_URL",xtype: "textfield",fieldLabel: "get地址",value:'http://127.0.0.1/hostip.cgi',allowBlank: false,width:600},
+                                {
+                                    xtype: "button",
+                                    iconCls: 'icon-accept',
+                                    text: "获取",
+                                    tooltip: '点击执行get',
+                                    style: {marginLeft: '5px'},
+                                    handler:function()
+                                    {
+                                        var form = this.up("form").getForm();
+                                        var formValues=form.getValues(); //获取表单中的所有Name键/值对对象
+
+                                        var getUrl = formValues["GET_URL"];
+                                        console.log(getUrl);
+
+                                        Ext.Ajax.request({
+                                            url: getUrl,
+                                            method:'GET',
+                                            success: function(response) {
+                                                console.log(response);
+                                                form.setValues({
+                                                    GET_RESULT:response.responseText
+                                                });
+                                            },
+                                            failure: function(f, action) {
+                                                console.log(action);
+                                                Ext.MessageBox.alert("错误", "获取失败");
+                                                form.setValues({
+                                                    GET_RESULT:''
+                                                });
+                                            }
+                                        });
+                                    }
+                                },
+                                {xtype: 'splitter'},
+                                {name: "GET_RESULT",itemId:"GET_RESULT",xtype: "textarea",fieldLabel: "结果",height: 100,width:600,readOnly:true}
+                            ]
+                        },
+                        {
+                            xtype: 'fieldset',
+                            collapsible: false,
+                            title: '测试post',
+                            //defaultType: 'textfield',
+                            layout: 'column',
+                            defaults: {
+                                anchor: '100%'
+                            },
+                            items: [
+                                {itemId: "POST_URL",name: "POST_URL",xtype: "textfield",fieldLabel: "post地址",value:'http://127.0.0.1/hostip.cgi',allowBlank: false,width:600},
+                                {
+                                    xtype: "button",
+                                    iconCls: 'icon-accept',
+                                    text: "获取",
+                                    tooltip: '点击执行post',
+                                    style: {marginLeft: '5px'},
+                                    handler:function()
+                                    {
+                                        var form = this.up("form").getForm();
+                                        var formValues=form.getValues(); //获取表单中的所有Name键/值对对象
+
+                                        var getUrl = formValues["POST_URL"];
+                                        console.log(getUrl);
+
+                                        Ext.Ajax.request({
+                                            url: getUrl,
+                                            method:'POST',
+                                            success: function(response) {
+                                                console.log(response);
+                                                form.setValues({
+                                                    POST_RESULT:response.responseText
+                                                });
+                                            },
+                                            failure: function(f, action) {
+                                                console.log(action);
+                                                Ext.MessageBox.alert("错误", "获取失败");
+                                                form.setValues({
+                                                    POST_RESULT:''
+                                                });
+                                            }
+                                        });
+                                    }
+                                },
+                                {xtype: 'splitter'},
+                                {name: "POST_RESULT",itemId:"POST_RESULT",xtype: "textarea",fieldLabel: "结果",height: 100,width:600,readOnly:true}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        //tab页面
+        var mainTab = Ext.create("Ext.tab.Panel", {
+            layout: "border",
+            flex: 1,
+            region : "center",
+            items: [mainForm]
+        });
+
+        var win = Ext.widget('viewport', {
+            constrain : true,
+            layout : 'border',
+            title : '配置盒子参数',
+            border : false,
+            items : [mainTab]
+        });
+    });
+</script>
+</body>
+</html>

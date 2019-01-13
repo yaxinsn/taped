@@ -1,0 +1,44 @@
+
+
+---pcre
+
+./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/work/record_voip/rundir/usr --exec-prefix=/work/record_voip/rundir/usr --bindir=/work/record_voip/rundir//usr/bin --sbindir=/work/record_voip/rundir//usr/sbin --libexecdir=/work/record_voip/rundir//usr/lib --sysconfdir=/work/record_voip/rundir//etc --datadir=/work/record_voip/rundir//usr/share --localstatedir=/var   CC=arm-linux-gnueabihf-gcc 
+
+--lighttpd
+
+./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/work/record_voip/rundir/usr --exec-prefix=/work/record_voip/rundir/usr --bindir=/work/record_voip/rundir//usr/bin --sbindir=/work/record_voip/rundir//usr/sbin --libexecdir=/work/record_voip/rundir//usr/lib --sysconfdir=/work/record_voip/rundir//etc --datadir=/work/record_voip/rundir//usr/share --localstatedir=/var  --without-bzip2 CFLAGS=-I/work/record_voip/rundir//usr/include LDFLAGS="-L/work/record_voip/rundir/usr/lib/ -lpcre"
+
+
+--json-c
+./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/work/record_voip/rundir/usr --exec-prefix=/work/record_voip/rundir/usr --bindir=/work/record_voip/rundir//usr/bin --sbindir=/work/record_voip/rundir//usr/sbin --libexecdir=/work/record_voip/rundir//usr/lib --sysconfdir=/work/record_voip/rundir//etc --datadir=/work/record_voip/rundir//usr/share --localstatedir=/var   CC=arm-linux-gnueabihf-gcc CFLAGS=-Wno-error=unused-but-set-variable
+[catgril@vmcentos7 bridge-utils-1.5]$ ./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/usr --exec-prefix=/usr --bindir=/usr/bin --sbindir=/usr/sbin --libexecdir=/usr/lib --sysconfdir=/etc --datadir=/usr/share --localstatedir=/var --mandir=/usr/man --infodir=/usr/info --disable-nls  --disable-ipv6 --with-linux-headers="/work/record_voip/linux-3.2.0-psp04.06.00.11" 
+
+--zlib
+
+
+CC="arm-linux-gnueabihf-gcc" ./configure --prefix=/tmp/usr --shared --uname=Linux
+
+
+[catgril@vmcentos7 dropbear-2015.67]$ ./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/usr --exec-prefix=/usr --bindir=/usr/bin --sbindir=/usr/sbin --libexecdir=/usr/lib --sysconfdir=/etc --datadir=/usr/share --localstatedir=/var --manffix="" --prefix=/usr --exec-prefix=/usr --bindir=/usr/bin --sbindir=/usr/sbin --libexecdir=/usr/lib --sysconfdir=/etc --datadir=/usr/share --localstatedir=/var --mandir=/usr/man --infodir=/usr/info^C
+
+---libcap
+
+
+$ ./configure -target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix= --program-suffix= --prefix=/work/record_voip/rundir/usr --exec-prefix=/work/record_voip/rundir/usr --bindir=/work/record_voip/rundir//usr/bin --sbindir=/work/record_voip/rundir//usr/sbin --libexecdir=/work/record_voip/rundir//usr/lib --sysconfdir=/work/record_voip/rundir//etc --datadir=/work/record_voip/rundir//usr/share --disable-ipv6 --enable-shared --enable-static --disable-yydebug --with-build-cc=gcc --with-pcap=linux --without-septel --without-dag --without-libnl --without-snf --disable-can --disable-canusb --disable-dbus --disable-bluetooth
+
+
+busybox
+
+.config
+CONFIG_CROSS_COMPILER_PREFIX="arm-linux-gnueabihf-"
+CONFIG_SYSROOT="/opt//gcc-linaro-arm-linux-gnueabihf-4.7-2013.03-20130313_linux/arm-linux-gnueabihf/libc"
+
+--lua
+
+make linux INSTALL_TOP=/work/record_voip/rundir/usr CC=arm-linux-gnueabihf-gcc
+
+---curl
+./configure --target=arm-linux-gnueabihf --host=arm-linux-gnueabihf --build=x86_64-redhat-linux --program-prefix="" --program-suffix="" --prefix=/work/record_voip/rundir/usr --exec-prefix=/work/record_voip/rundir/usr --bindir=/work/record_voip/rundir//usr/bin --sbindir=/work/record_voip/rundir//usr/sbin --libexecdir=/work/record_voip/rundir//usr/lib --sysconfdir=/work/record_voip/rundir//etc --datadir=/work/record_voip/rundir//usr/share --localstatedir=/var CC=arm-linux-gnueabihf-gcc CFLAGS=-Wno-error=unused-but-set-variable
+make;
+
+
