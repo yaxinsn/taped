@@ -44,6 +44,12 @@ taped: $(progam_obj) $(lib_obj) $(voice_lib_obj)
 	$(CC) $(LDFLAGS) -Wl,-rpath=./  $(CFLAGS) $^ $(LIB) -o $@ 
 #	$(CC) $(LDFLAGS) -Wl,-rpath=./  $^ -o $@ -L./ ./json-c/.libs/libjson-c.so
 
+install:taped
+	cp taped $(TARGET_DIR)/home/root/rundir/usr/sbin/ -rf
+
+tar:install
+	cd $(TARGET_DIR)/  &&  tar czf rootfsVXXX.tar.gz etc/ home/ && mv rootfsVXXX.tar.gz ../
+
 
 clean:
 	rm taped *.o -f
