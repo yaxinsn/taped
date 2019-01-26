@@ -3,8 +3,8 @@
 
 CC=arm-linux-gnueabihf-gcc
 
-TARGET_DIR=../../rundir
-STAGING_DIR=../
+TARGET_DIR=../rundir
+STAGING_DIR=../staging_dir/staging_dir
 TOOLCHAIN_DIR=/opt/gcc-linaro-arm-linux-gnueabihf-4.7-2013.03-20130313_linux/arm-linux-gnueabihf/libc/
 progam_src =   main.c  sniffer_sip.c upload.c heart.c config.c sniffer_rtp.c phone_session.c sniffer_skinny.c curl_upload.c
 progam_obj =  $(progam_src:.c=.o)
@@ -21,10 +21,10 @@ CFLAGS +=  -Wno-deprecated-declarations -Wextra -Wwrite-strings -Wno-unused-para
 CFLAGS += -g -O2
 #CFLAGS += -Werror=parentheses
 #-std=gnu99 -D_GNU_SOURCE -D_REEN^CANT -g -O2
-CFLAGS +=-I$(TARGET_DIR)/usr/include  -I./
+CFLAGS +=-I$(STAGING_DIR)/usr/include  -I./
 CFLAGS += -I./ -I./libs/ -I./voice_lib/ -I$(TOOLCHAIN_DIR)/usr/include
 
-LDFLAGS = -L$(TARGET_DIR)/usr/lib/ -ljson-c -lpcap -lpthread -lcurl
+LDFLAGS = -L$(STAGING_DIR)/usr/lib/ -ljson-c -lpcap -lpthread -lcurl
 vpath %.c ./libs ./voice_lib
 vpath %.c  ./voice_lib
 vpath %.h ./libs ./voice_lib
@@ -32,7 +32,7 @@ vpath %.h  ./voice_lib
 
 
 all: taped
-LIB=$(TARGET_DIR)/usr/lib/libjson-c.so
+LIB=$(STAGING_DIR)/usr/lib/libjson-c.so
 
 
 $(all_src:.c=.o): %.o : %.c
