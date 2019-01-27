@@ -30,13 +30,14 @@ vpath %.c  ./voice_lib
 vpath %.h ./libs ./voice_lib
 vpath %.h  ./voice_lib
 
+HFILE=$(shell ls *.h)
 
 all: taped
 LIB=$(STAGING_DIR)/usr/lib/libjson-c.so
 
 
-$(all_src:.c=.o): %.o : %.c
-	$(CC) $(CFLAGS)  $^ -c -o $@
+$(all_src:.c=.o): %.o : %.c $(HFILE)
+	$(CC) $(CFLAGS)  $< -c -o $@
 
 
 taped: $(progam_obj) $(lib_obj) $(voice_lib_obj)
