@@ -581,7 +581,7 @@ int get_session_start_time(struct sip_pkt* spkt_p, struct session_info* ss)
         return -1;
     strptime(c,"%a, %d %B %Y %T %Z",&ttm);
     sip_log(" I get time: acstime %s  \n",asctime(&ttm));
-    memcpy(&ss->ring_time,&ttm,sizeof(ttm));
+ //   memcpy(&ss->ring_time,&ttm,sizeof(ttm));
     return 0;
 }
 

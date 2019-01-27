@@ -1266,7 +1266,7 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
 
     memcpy(&rs->ring_time,localtime(&a),sizeof(struct tm));;
 
-    ss->start_time_stamp = a;
+   // ss->start_time_stamp = a;
     rs->start_time_stamp = a;
     rs->call_dir = ss->mode;
     memcpy(&rs->called,&ss->called,sizeof(ss->called));
