@@ -119,8 +119,8 @@ int get_config_hostip(json_object* j_cfg,struct config_st* c )
 int get_config_ntp_server(json_object* j_cfg,struct config_st* c )
 {	
 	const char* str;
-	struct json_object *o;
-	enum json_type o_type;
+//	struct json_object *o;
+//	enum json_type o_type;
 	//int ret;
 	struct ntp_st* p_ntp = &c->ntp;
 	
@@ -318,12 +318,13 @@ int get_config_tape(json_object* j_cfg,struct config_st* c )
     
 	return 0;
 }
-
+#include <sys/ioctl.h>
 int get_eth0_mac(u8* mac)
 {
     int fd                     = -1;
-    struct ifreq stIfreq            = {0};
+    struct ifreq stIfreq            ;
 
+	memset(&stIfreq,0,sizeof(stIfreq));
     fd = socket(AF_INET,SOCK_DGRAM,0);
 	if(fd < 0)
 	{

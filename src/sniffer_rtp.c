@@ -43,90 +43,6 @@
 #include "phone_session.h"
 
 extern struct config_st g_config;
-struct linear_mix_list_st
-{
-    
-    struct list_head* linear_buf_list;
-    
-    struct list_head* _mix_list;
-    
-    struct list_head  _list_a;
-    struct list_head  _list_b;
-    u32 _pkt_count;
-    int mix_ready_flag;
-    
-};
-struct rtp_session_info
-{
-    
-    struct list_head node;
-    pthread_t   thread_id;
-    pcap_t*     pd;
-   
-    int     call_dir; /// is same the ss mode.
- 
-    struct  person calling;  //sip msg header From
-    struct  person called;   //sip msg header to
-    FILE*   save_calling_fp;
-    FILE*   save_called_fp;
-    u8     rtp_type;
-
-    time_t start_time_stamp;
-
-    time_t stop_time_stamp;
-    //struct session_info* session;
-    struct tm ring_time; 
-    struct tm end_time;
-
-/* 2018-6-10 */
-    struct mixer stMix;
-    int mix_count;
-    g722_decode_state_t* g722dst_calling;
-
-    g722_decode_state_t* g722dst_called;
-    FILE* save_mix_fp; 
-
-    FILE* save_calling_linear_fp; 
-    FILE* save_called_linear_fp; 
-    
-    char calling_name_linear[256];
-    
-    char called_name_linear[256];
-    char mix_file_name[256];
-
-     
-     int calling_pkt_count;
-     int called_pkt_count;
-  #if 0   
-     struct list_head* p_calling_linear_buf_list;
-     struct list_head*  p_called_linear_buf_list;
-     
-     struct list_head  calling_linear_buf_list_a;
-     struct list_head  called_linear_buf_list_a;
-     struct list_head  calling_linear_buf_list_b;
-     struct list_head  called_linear_buf_list_b;
-
-     
-     struct list_head* p_calling_linear_buf_mix_list;
-     struct list_head*  p_called_linear_buf_mix_list;
-#endif
-     struct linear_mix_list_st calling_mix_list_st;
-
-     struct linear_mix_list_st called_mix_list_st;
-
-     int mix_file_frag_count;
-     int mix_file_frag_info_caller;  //   0 is user hung up. the rtp is stop;   1 is session_talking_2
-     int session_id;
-     int exit_flag;
-	 char called_group_number[64];
-};
-
-typedef struct linear_buf_st
-{    
-    struct list_head node;
-    int len;
-    u8*  p_buf;
-}linear_buf;
 
 
 struct rtp_ctx_t
@@ -140,7 +56,7 @@ struct rtp_ctx_t
 struct rtp_ctx_t rtp_ctx;
 
 
-struct rtp_session_info* _rtp_new_session()
+struct rtp_session_info* _rtp_new_session(void)
 {
     struct rtp_session_info* rs = NULL;
 	
@@ -200,7 +116,7 @@ enum RTP_TYPE
 struct rtp_type_str
 {
     enum RTP_TYPE type;
-    char* type_str;
+    const char* type_str;
 };
 struct rtp_type_str g_rtp_file_perfix[] = 
 {
@@ -294,7 +210,7 @@ static int session_talking_pkt_dec722
     //int mix_len;
 //    bool ret;
     
-    dest_buf = rtp_g722_decode(g722_decode,payload,payload_len,&dest_g722_len);
+    dest_buf = rtp_g722_decode(g722_decode,(char*)payload,payload_len,&dest_g722_len);
     if(dest_buf){
         fwrite(dest_buf,dest_g722_len,1,fp);
         free(dest_buf);
@@ -318,7 +234,7 @@ static int session_talking_pkt_dec711u
     int mix_len;
     bool ret;
     
-    dest_buf =  ulawcodec_decode(payload,  payload_len,&dest_g711u_len);
+    dest_buf =  (u8*)ulawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
     if(dest_buf){
         fwrite(dest_buf,dest_g711u_len,1,fp);
@@ -343,7 +259,7 @@ static int session_talking_pkt_dec711a
     int mix_len;
     bool ret;
     
-    dest_buf =  alawcodec_decode(payload,  payload_len,&dest_g711u_len);
+    dest_buf =  (u8*)alawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
     if(dest_buf){
         fwrite(dest_buf,dest_g711u_len,1,fp);
@@ -409,7 +325,7 @@ static void session_talking(struct iphdr* iph,struct udphdr* udph,
         else
         {
             log_err("this pkt not a g722, g711u, I can't decode it \n");
-            return -1;
+            return;
         }
     }
 
@@ -442,7 +358,7 @@ static void session_talking(struct iphdr* iph,struct udphdr* udph,
         else
         {
             log_err("this pkt not a g722, g711u, I can't decode it \n");
-            return -1;
+            return;
         }
     }
 
@@ -458,7 +374,7 @@ static int session_talking_pkt_dec722_2
     //int mix_len;
     bool ret;
     
-    dest_buf = rtp_g722_decode(g722_decode,payload,payload_len,&dest_g722_len);
+    dest_buf = (u8*)rtp_g722_decode(g722_decode,(char*)payload,payload_len,&dest_g722_len);
     if(dest_buf){
         lb->len = dest_g722_len;
         lb->p_buf = dest_buf;
@@ -484,7 +400,7 @@ static int session_talking_pkt_dec711u_2
     int mix_len;
     bool ret;
     
-    dest_buf =  ulawcodec_decode(payload,  payload_len,&dest_g711u_len);
+    dest_buf =  (u8*)ulawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
     if(dest_buf){
         lb->len = dest_g711u_len;
@@ -509,7 +425,7 @@ static int session_talking_pkt_dec711a_2
     int mix_len;
     bool ret;
     
-    dest_buf =  alawcodec_decode(payload,  payload_len,&dest_g711u_len);
+    dest_buf =  (u8*)alawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
     if(dest_buf){
         lb->len = dest_g711u_len;
@@ -629,7 +545,7 @@ int linear_list_mix(struct rtp_session_info* rs)
     } while((!list_empty(_mix_list_a))||(!list_empty(_mix_list_b)));
 
     fclose(dest_fp);
-    
+    return 0;
 }
 static  int linear_buf_save_to_list(
     linear_buf*   lb,
@@ -724,9 +640,9 @@ static void session_talking_2(struct iphdr* iph,struct udphdr* udph,
 }
 
 /****************************************************/
-char* get_rtp_type(u8 type)
+const char* get_rtp_type(u8 type)
 {
-    int i;
+    u32 i;
     for(i = 0;i<sizeof(g_rtp_file_perfix)/sizeof(struct rtp_type_str);i++)
     {
         if(type == g_rtp_file_perfix[i].type)
@@ -1058,38 +974,19 @@ int thread_kill(pthread_t thread_id)
     
     return 0;
 }
-void update_rtp_session_number(struct session_info* ss)
-{
-	struct rtp_session_info* n;
-    if(ss->rtp_sniffer_tid)
-    {
-		n = _rtp_find_session(ss->rtp_sniffer_tid);
-    	if(n)
-    	{
-        	log("I(%u) update (%u)'s calling and called number \n",
-				pthread_self(),
-				ss->rtp_sniffer_tid);   
-    		strncpy(n->called.number, ss->called.number,sizeof(n->called.number));
-    		strncpy(n->calling.number, ss->calling.number,sizeof(n->calling.number));
-			strncpy(n->called_group_number, 
-				ss->called_group_number,
-				sizeof(n->called_group_number));
-    	}
-    }
-}
 
-void close_rtp_sniffer(struct session_info* ss)
+void close_rtp_sniffer(unsigned long rtp_sniffer_tid)
 {
 
     //session_down();
     
     //time(&ss->stop_time_stamp);
    // struct rtp_session_info* n;
-    if(ss->rtp_sniffer_tid)
+    if(rtp_sniffer_tid)
     {
     
         log(" I (%u) kill %ul thread(rtp) \n",(unsigned long)pthread_self()
-                ,(unsigned long)ss->rtp_sniffer_tid);
+                ,(unsigned long)rtp_sniffer_tid);
 #if 0
         n = _rtp_find_session(ss->rtp_sniffer_tid);
         if(n)
@@ -1104,7 +1001,7 @@ void close_rtp_sniffer(struct session_info* ss)
         }
 #endif
           
-        thread_kill(ss->rtp_sniffer_tid);
+        thread_kill(rtp_sniffer_tid);
     }
 }
 

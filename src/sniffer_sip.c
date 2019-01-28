@@ -189,7 +189,7 @@ char* __find_msg_body_key(const char* src,const char* key,int* v_len)
 从src中找到key，然后把key后面的内容copy到dest中。
 **dest 返回已经copy好的内容的地址。
 **/
-const char* __parse_msg_heade_body_str_element
+char* __parse_msg_heade_body_str_element
 (const char* src,const char* key,char** dest)
 {
     int len=0;
@@ -207,11 +207,7 @@ const char* __parse_msg_heade_body_str_element
     }
     return v;
 }
-int parse_msg_body(struct sip_pkt* sp)
-{
-	int ret = 0;
-	parse_msg_body_sdp_media_connect(sp);
-}
+
 /*
 这个函数有问题，
 SDP报文中有多组(media connect) 如audio和video。
@@ -227,7 +223,7 @@ int parse_msg_body_sdp_media_connect(struct sip_pkt* sp)
     char* media_line = NULL;
     const char* origin_media_line;
     char* connect_line = NULL;
-    const char* origin_connect_line;
+    //char* origin_connect_line;
     int ret;
     int offset;
     int flag = 0;
@@ -268,20 +264,26 @@ end:
     {
         offset = strlen(media_line);
       //  printf("%s \n",origin_media_line+offset);
-        origin_connect_line = __parse_msg_heade_body_str_element
+        __parse_msg_heade_body_str_element
             (origin_media_line+offset,"c=",&connect_line);
         ret = parse_sdp_connection_info(connect_line,sp);
         FREE(connect_line);
     }
     else
     {
-        origin_connect_line = __parse_msg_heade_body_str_element
+         __parse_msg_heade_body_str_element
             (b,"c=",&connect_line);
         ret = parse_sdp_connection_info(connect_line,sp);
         FREE(connect_line);
     }
     return 0;
 }
+int parse_msg_body(struct sip_pkt* sp)
+{
+//	int ret = 0;
+	return parse_msg_body_sdp_media_connect(sp);
+}
+
 #if 0
 int parse_msg_body(struct sip_pkt* sp)
 {
@@ -530,18 +532,7 @@ int pase_sip_start_line(char* l,struct sip_pkt* sp)
 	return 0;
 }
 
-void create_session(struct sip_pkt* spkt_p)
-{
-     struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
-     if(!ss)
-     {
-        _create_session(spkt_p);
-     }
-     else
-     {
-        sip_log("INVATE this session (callid %s) is exist\n",spkt_p->msg_hdr.call_id);
-     }
-}
+
 void _create_session(struct sip_pkt* spkt_p)
 {
     struct session_info* ss = si_new_session();
@@ -573,6 +564,19 @@ void _create_session(struct sip_pkt* spkt_p)
 		sip_log_err("ss is not created!\n");
 	}
 }
+void create_session(struct sip_pkt* spkt_p)
+{
+     struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
+     if(!ss)
+     {
+        _create_session(spkt_p);
+     }
+     else
+     {
+        sip_log("INVATE this session (callid %s) is exist\n",spkt_p->msg_hdr.call_id);
+     }
+}
+
 int get_session_start_time(struct sip_pkt* spkt_p, struct session_info* ss)
 {
     char* c =  spkt_p->msg_hdr.date;
@@ -769,7 +773,7 @@ void _close_session(struct sip_pkt* spkt_p)
             sip_log("I find the session (callid %s),and close it. \n",ss->call_id);
  //           ss->state = spkt_p->state;
             
-            close_rtp_sniffer(ss);
+            close_rtp_sniffer(ss->rtp_sniffer_tid);
         }
         else
         {

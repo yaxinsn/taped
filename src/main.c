@@ -34,11 +34,15 @@ main.c
 #include "upload.h"
 #include "sniffer_sip.h"
 #include "sniffer_rtp.h"
+#include "sniffer_skinny.h"
 
-int main_log(char* s)
+
+extern pthread_t heart_start(void);
+
+int main_log(const char* s)
 {
     char log[1000]={0};
-    sprintf(log,"echo %s >> /home/root/core/main.log");
+    sprintf(log,"echo %s >> /home/root/core/main.log",s);
     system(log);
     return 0;
 }
@@ -119,8 +123,7 @@ int main(int argc,char* argv[])
 		exit(1);
 	}
 
-
-		heart = heart_start();
+	heart = heart_start();
 	if(heart == 0)
 	{
 		log("heart start error, exit\n");

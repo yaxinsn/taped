@@ -90,7 +90,8 @@ struct sip_pkt
 
 
 
-pthread_t sniffer_sip_start();
+//pthread_t sniffer_sip_start();
+pthread_t sniffer_sip_start(void);
 
 #endif
 

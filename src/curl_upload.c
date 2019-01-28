@@ -33,7 +33,7 @@ void set_up_formpost(struct curl_httppost** formpost,struct curl_httppost** last
     struct upload_file_info* info)
 {
 	
-    char* path_and_filename[256]={0};
+    char path_and_filename[256]={0};
   /* Fill in the submit field too, even if this is rarely needed */
   curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
@@ -229,13 +229,13 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
 //  CURLcode res;
 
  // CURLM *multi_handle;
-  int still_running;
+//  int still_running;
 
   struct HttpPost *formpost=NULL;
   struct HttpPost *lastptr=NULL;
   struct curl_slist *headerlist=NULL;
   char buf[] = "Expect:";
-  int ret;
+  int ret = 0;
   CURLcode res = CURLE_OK; 
   char server_ret_msg[2048]={0};
 
@@ -258,10 +258,10 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
-    curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost);
+    curl_easy_setopt((struct curl_httppost*)curl, CURLOPT_HTTPPOST, formpost);
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,server_return_funtion);
     
-    curl_easy_setopt(curl,CURLOPT_WRITEDATA,server_ret_msg);
+    curl_easy_setopt((struct curl_httppost* )curl,CURLOPT_WRITEDATA,server_ret_msg);
     res = curl_easy_perform(curl);  
 
 
