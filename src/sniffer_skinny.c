@@ -492,7 +492,7 @@ void __skinny_foreach_media_list(struct skinny_callReference_info* skinny_callRe
 	list_for_each_entry_safe(p,n,si_head,node)
 	{
 		
-		func(n,skinny_callRefer_info);
+		func(p,skinny_callRefer_info);
 	}
 
 }
@@ -533,7 +533,10 @@ void close_skinny_media(skinny_media_info* sm,
 	struct skinny_callReference_info* skinny_callRefer_info)
 {
 	
-        close_rtp_sniffer(sm->passThruPartyID);
+    skinny_log(" close this callid %u sm %p media %u \n",skinny_callRefer_info->call_id,
+    sm,sm->passThruPartyID);
+
+    close_rtp_sniffer(sm->session_comm_info.rtp_sniffer_tid);
         __skinny_del_media(skinny_callRefer_info,sm);
 }
 void close_skinny_session_by_Callid(u32 callid)
@@ -544,6 +547,9 @@ void close_skinny_session_by_Callid(u32 callid)
     skinny_callRefer_info = skinny_get_session(callid);
     if(skinny_callRefer_info)
     {
+    
+        skinny_log(" close this callid %u  \n",skinny_callRefer_info->call_id);
+        
     	__skinny_foreach_media_list(skinny_callRefer_info,close_skinny_media);
         
     }
@@ -608,15 +614,23 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
     	skinny_log("start rtp sniffer and skinny find the group number <%s> \n",
     		sm->session_comm_info.called_group_number);
     }
+    
+	skinny_log("_-_-_-----\n");
     if((sm->session_comm_info.called.ip.s_addr !=0)
     	&&(sm->session_comm_info.calling.ip.s_addr !=0)
     	&&(skinny_callRefer_info->skinny_callstate_connected == 1))
 	{
     	sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
+
+    	
+	skinny_log("_-_-_----- sm->session_comm_info.rtp_sniffer_tid %u\n",sm->session_comm_info.rtp_sniffer_tid);
     }
 }
 void __start_rtp_sniffer(struct skinny_callReference_info* skinny_callRefer_info)
 {
+
+	skinny_log("_-_-_-----\n");
+
 	__skinny_foreach_media_list(skinny_callRefer_info, __start_media_rtp_sniffer);
 
 }
@@ -732,14 +746,16 @@ void handle_startMediaTransmissionACK(
     skinny_callRefer_info = skinny_get_session_by_callRef(callReference);
     if(skinny_callRefer_info)
     {   	
-    	sm =  __skinny_new_media(skinny_callRefer_info);
+    	sm =  __skinny_find_media(skinny_callRefer_info,passThruPartyID);
     	if(!sm)
     	{
-    		skinny_log_err("create new media failed\n");
+    		skinny_log_err("find the media  media failed!@@@\n");
     		goto END;
     	}
     	
-    	sm->passThruPartyID = passThruPartyID;
+    		skinny_log("find the media  media successfully!@@@ sm %p, passThruPartyID %u\n",
+    		sm,passThruPartyID);
+    	//sm->passThruPartyID = passThruPartyID;
     	sm->pfather = skinny_callRefer_info;
     	
       if(skinny_callRefer_info->mode == SS_MODE_CALLING){
@@ -781,7 +797,7 @@ void handle_startMediaTransmissionACK(
     u32 callReference;
     u32 portHandingFlag;
 
-    char callid[32] = {0};
+   // char callid[32] = {0};
     //struct skinny_callReference_info* skinny_callRefer_info;
         
     skinny_log("close the callid \n");
@@ -790,7 +806,9 @@ void handle_startMediaTransmissionACK(
     CW_LOAD_U32(callReference,p);
     CW_LOAD_U32(portHandingFlag,p);
     
-    sprintf(callid,"%u",callReference);
+  //  sprintf(callid,"%u",callReference);
+
+
     skinny_log("close the callid(%u) \n",callReference);
     close_skinny_session_by_Callid(callReference);
  }

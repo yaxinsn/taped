@@ -982,7 +982,7 @@ void close_rtp_sniffer(unsigned long rtp_sniffer_tid)
     if(rtp_sniffer_tid)
     {
     
-        log(" I (%u) kill %ul thread(rtp) \n",(unsigned long)pthread_self()
+        log(" I (%u) kill %u thread(rtp) \n",(unsigned long)pthread_self()
                 ,(unsigned long)rtp_sniffer_tid);
 #if 0
         n = _rtp_find_session(ss->rtp_sniffer_tid);
@@ -1089,6 +1089,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
 	}
 	sprintf(callingip_str,"%s",inet_ntoa(ss->calling.ip));
 	sprintf(calledip_str,"%s",inet_ntoa(ss->called.ip));
+	
 	sprintf(filter,"\(udp and host %s and port %d \) or \(udp and host %s and port %d \) ",
 	    callingip_str,
 	    ss->calling.port,

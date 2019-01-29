@@ -87,7 +87,6 @@ typedef struct skinny_media_info_st //与信令协议 sip ,skinny无关。是更
 {
     struct list_head 			node;
 
-	struct session_info      session_comm_info;
 
     //char passThruPartyID[32]; 
 	u32 						passThruPartyID;
@@ -95,6 +94,7 @@ typedef struct skinny_media_info_st //与信令协议 sip ,skinny无关。是更
 
     skinny_callRefer* 			pfather;
      
+	struct session_info      session_comm_info;
 }skinny_media_info; /* 用于记录本次通信的两者的ip, port, 电话号码，用户名等等。*/
 
 pthread_t sniffer_skinny_start(void);

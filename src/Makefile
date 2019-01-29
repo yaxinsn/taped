@@ -16,11 +16,11 @@ lib_obj =  $(lib_src:.c=.o)
 voice_lib_obj =  $(voice_lib_src:.c=.o)
 
 all_src = $(progam_src) $(lib_src) $(voice_lib_src)
-CFLAGS += -Wall -Werror
+CFLAGS += -Wall #-Werror
 #CFLAGS += -Wno-unused-result -Wno-discarded-qualifiers
 CFLAGS +=  -Wno-deprecated-declarations 
 #-Wextra -Wwrite-strings -Wno-unused-parameter 
-#-Wno-unused-function -Wno-implicit-function-declaration -Wno-unused-variable
+CFLAGS += -Wno-unused-function -Wno-implicit-function-declaration -Wno-unused-variable
 CFLAGS += -g -O2
 #CFLAGS += -Werror=parentheses
 #-std=gnu99 -D_GNU_SOURCE -D_REEN^CANT -g -O2
