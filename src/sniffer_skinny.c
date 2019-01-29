@@ -606,6 +606,15 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
 
 	
     sm->session_comm_info.mode = skinny_callRefer_info->mode;
+    strncpy(sm->session_comm_info.called.number, 
+			skinny_callRefer_info->called_number,
+			sizeof(sm->session_comm_info.called.number));
+	
+	strncpy(sm->session_comm_info.calling.number, 
+		skinny_callRefer_info->calling_number,
+		sizeof(sm->session_comm_info.calling.number));
+
+				
     if(skinny_callRefer_info->called_group_number[0] != 0)
     {
     	strncpy(sm->session_comm_info.called_group_number,
