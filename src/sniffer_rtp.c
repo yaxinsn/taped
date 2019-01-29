@@ -29,6 +29,8 @@
 #include <fcntl.h>
 #include <string.h>
 
+#include "alaw.h"
+
 #include "ulaw_codec.h"
 
 #include "log.h"
@@ -37,6 +39,7 @@
 
 
 #include "mixer.h"
+#include "alaw_codec.h"
 
 #include "curl_upload.h"
 
@@ -163,13 +166,6 @@ struct rttphdr{
 
 int upload_the_mix_file( struct rtp_session_info* n);
 /**************************************************************/
-
-static int save_rtp_frame(FILE* fp,void* buffer,int len)
-{
-    if(fp)
-        return fwrite(buffer,len,1,fp);
-    return -1;
-}
 u8* rtp_g722_decode(g722_decode_state_t* g722dst,char *src, int src_len, int* len) 
 {
 	//*len = 0;
@@ -200,7 +196,7 @@ u8* rtp_g722_decode(g722_decode_state_t* g722dst,char *src, int src_len, int* le
 
 	return char_dst;
 }
-
+#if 0
 static int session_talking_pkt_dec722
 (struct rtp_session_info* rs,u8* payload, int payload_len,
    u8 rty_type,FILE* fp,g722_decode_state_t* g722_decode)
@@ -231,8 +227,8 @@ static int session_talking_pkt_dec711u
 {
     int dest_g711u_len;
     u8* dest_buf;
-    int mix_len;
-    bool ret;
+//    int mix_len;
+//    bool ret;
     
     dest_buf =  (u8*)ulawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
@@ -256,8 +252,8 @@ static int session_talking_pkt_dec711a
 {
     int dest_g711u_len;
     u8* dest_buf;
-    int mix_len;
-    bool ret;
+//    int mix_len;
+//    bool ret;
     
     dest_buf =  (u8*)alawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
@@ -363,6 +359,7 @@ static void session_talking(struct iphdr* iph,struct udphdr* udph,
     }
 
 }
+#endif
 //////////////////////////////////////////////////
 
 static int session_talking_pkt_dec722_2
@@ -372,7 +369,7 @@ static int session_talking_pkt_dec722_2
     int dest_g722_len;
     u8* dest_buf;
     //int mix_len;
-    bool ret;
+//    bool ret;
     
     dest_buf = (u8*)rtp_g722_decode(g722_decode,(char*)payload,payload_len,&dest_g722_len);
     if(dest_buf){
@@ -397,8 +394,8 @@ static int session_talking_pkt_dec711u_2
 {
     int dest_g711u_len;
     u8* dest_buf;
-    int mix_len;
-    bool ret;
+ //   int mix_len;
+//    bool ret;
     
     dest_buf =  (u8*)ulawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
@@ -422,8 +419,8 @@ static int session_talking_pkt_dec711a_2
 {
     int dest_g711u_len;
     u8* dest_buf;
-    int mix_len;
-    bool ret;
+   // int mix_len;
+   // bool ret;
     
     dest_buf =  (u8*)alawcodec_decode((char*)payload,  payload_len,&dest_g711u_len);
     
@@ -450,7 +447,7 @@ static linear_buf* session_talking_pkt_to_linear
    // int dest_g722_len;
    // u8* dest_buf;
  //   int mix_len;
-    bool ret;
+    //bool ret;
     linear_buf*   lb; 
     lb = malloc(sizeof(linear_buf));
     if(lb == NULL)
@@ -528,14 +525,14 @@ int linear_list_mix(struct rtp_session_info* rs)
     {
         if(!list_empty(_mix_list_a)){
             lb_a = list_first_entry(_mix_list_a, typeof(*lb_a), node);
-            mix(mix_engine,lb_a->p_buf,lb_a->len,&mix_len);
+            mix(mix_engine,(char*)lb_a->p_buf,lb_a->len,&mix_len);
             list_del(&lb_a->node);
             FREE(lb_a->p_buf);
             FREE(lb_a);
         }
         if(!list_empty(_mix_list_b)){
             lb_b = list_first_entry(_mix_list_b, typeof(*lb_b), node);
-            mix(mix_engine,lb_b->p_buf,lb_b->len,&mix_len);
+            mix(mix_engine,(char*)lb_b->p_buf,lb_b->len,&mix_len);
             list_del(&lb_b->node);
             FREE(lb_b->p_buf);
             FREE(lb_b);
@@ -760,7 +757,7 @@ int upload_the_mix_file(struct rtp_session_info* n)
     struct upload_file_info ufi;
     char time_str[256]={0};
     struct config_st* c = &g_config;    
-    char ring_time[256]={0};
+//    char ring_time[256]={0};
     
     
     strncpy(ufi.call_caller_number,n->calling.number,sizeof(ufi.call_caller_number));
@@ -1108,16 +1105,10 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
 {
 	pthread_t tid;
 	pcap_t* pd;
-	//char mix_file[256]={0};
-	//char file_name2[256]={0};
-	//char file_name3[256]={0};
-//	char file_name2_linear[256]={0};
-//	char file_name3_linear[256]={0};
 	struct rtp_session_info* rs;
-//	int t= 0;
 
     time_t a;
-    //ss->start_time_stamp = a;
+
 	if (ss->mode == SS_MODE_CALLED){
 	    log("this session is called (slave) \n");
 	}
@@ -1163,7 +1154,6 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
 
     memcpy(&rs->ring_time,localtime(&a),sizeof(struct tm));;
 
-   // ss->start_time_stamp = a;
     rs->start_time_stamp = a;
     rs->call_dir = ss->mode;
     memcpy(&rs->called,&ss->called,sizeof(ss->called));
@@ -1179,41 +1169,6 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
     rs->g722dst_called = (void*)g722_decode_init((g722_decode_state_t*) rs->g722dst_called, G722BITSRATE, 1 /* 表明采用8000采样 */);
     rs->g722dst_calling= (void*)g722_decode_init((g722_decode_state_t*) rs->g722dst_calling, G722BITSRATE, 1 /* 表明采用8000采样 */);
 
-#if 0
-    t += sprintf(mix_file,"/tmp/%s_to_",inet_ntoa(ss->calling.ip));
-    t += sprintf(mix_file+t,"%s_",inet_ntoa(ss->called.ip));
-    t += sprintf(mix_file+t,"%lu.mixed_linear",a);
-    
-    log("DEBUG here MIX file  %s\n",mix_file);
-    rs->save_mix_fp = fopen(mix_file,"w");
-   
-    t=0;
-    t += sprintf(file_name2,"/tmp/to_%s_",inet_ntoa(ss->called.ip));
-    t += sprintf(file_name2+t,"%lu.pkt",a);
-    rs->save_called_fp = fopen(file_name2,"w");
-    strcpy(rs->called_name,file_name2);
-    
-    t=0;
-    t += sprintf(file_name3,"/tmp/from_%s_",inet_ntoa(ss->calling.ip));
-    t += sprintf(file_name3+t,"%lu.pkt",a);
-    rs->save_calling_fp = fopen(file_name3,"w");
-    strcpy(rs->calling_name,file_name3);
-
-    
-
-    t=0;
-    t += sprintf(file_name2_linear,"/tmp/to_%s_",inet_ntoa(ss->called.ip));
-    t += sprintf(file_name2_linear+t,"%lu.linear",a);
-    rs->save_called_linear_fp = fopen(file_name2_linear,"w");
-    strcpy(rs->called_name_linear,file_name2_linear);
-    
-    t=0;
-    t += sprintf(file_name3_linear,"/tmp/from_%s_",inet_ntoa(ss->calling.ip));
-    t += sprintf(file_name3_linear+t,"%lu.linear",a);
-    rs->save_calling_linear_fp = fopen(file_name3_linear,"w");
-    strcpy(rs->calling_name_linear,file_name3_linear);
-
-#endif
 
     
  //   log("DEBUG here\n");

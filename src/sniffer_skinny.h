@@ -32,7 +32,7 @@ extern FILE* skinny_log_fp;
 
 
 #define skinny_log_err(fmt,...)  \
-						skinny_log("ERROR|"fmt,##__VA_ARGS__); 
+            skinny_log("ERROR|"fmt,##__VA_ARGS__); 
 
 enum skinny_session_state
 {
@@ -42,19 +42,60 @@ enum skinny_session_state
 
 struct skinny_frame
 {
-	int from_server;// 1  yes (this is respo pkt), 0 no. 0 is to server. this is request pkt.
-	char* line;
-	char*  sip_msg_body;
+  int from_server;// 1  yes (this is respo pkt), 0 no. 0 is to server. this is request pkt.
+  char* line;
+  char*  sip_msg_body;
 
-	//struct sip_msg_header msg_hdr;
-	u8 body_sdp;
+  //struct sip_msg_header msg_hdr;
+  u8 body_sdp;
 
-	u16    rtp_port;//不知道是src dest.
-	struct in_addr rtp_ip;
-	//struct session_info* ss;
+  u16    rtp_port;//不知道是src dest.
+  struct in_addr rtp_ip;
+  //struct session_info* ss;
 
-	enum skinny_session_state state;
+  enum skinny_session_state state;
 };
+
+typedef struct skinny_callReference_info
+{
+
+
+	struct list_head node;
+    //char call_id[32]; 
+    u32 			call_id;
+   // u32   callReference; //for skinny;
+    /* 如何判断calling? 如何说INVATE的IP层srcIP == sdp.
+    connection IP.  this ip 就是calling. */
+  //  struct  person calling;
+  //  struct  person called;
+    
+    int 			mode; /* call direction   */ // 1是主叫，2是被叫。
+    char    		called_group_number[64];
+    
+    char           	called_number[64];
+    char           	calling_number[64];
+   // pthread_t 		rtp_sniffer_tid;
+
+    
+    int 			skinny_state;//1 = ;2=onHOOK(挂机)
+    int 			skinny_callstate_connected;
+    struct list_head skinny_media_list;
+
+}skinny_callRefer;
+
+typedef struct skinny_media_info_st //与信令协议 sip ,skinny无关。是更高一级的应用数据。把从信令中得到的信息保存于此。
+{
+    struct list_head 			node;
+
+	struct session_info      session_comm_info;
+
+    //char passThruPartyID[32]; 
+	u32 						passThruPartyID;
+
+
+    skinny_callRefer* 			pfather;
+     
+}skinny_media_info; /* 用于记录本次通信的两者的ip, port, 电话号码，用户名等等。*/
 
 pthread_t sniffer_skinny_start(void);
 
@@ -82,7 +123,10 @@ static const value_string DCallState[] = {
   { 0x00000, NULL }
 };
 #endif
-#define SKINNY_CALLSTATE_RING_IN 	0x04
+#define SKINNY_CALLSTATE_ONHOOK   0x02 //表示挂机。
+
+#define SKINNY_CALLSTATE_RING_OUT  0x03
+#define SKINNY_CALLSTATE_RING_IN  0x04
 #define SKINNY_CALLSTATE_CONNECTED 0x05
 #define SKINNY_CALLSTATE_Proceed   0x0c
 

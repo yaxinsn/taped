@@ -1,4 +1,27 @@
 
+
+//
+/* 
+Modify 1：2019-1-26 BingXi（并席）功能，
+    key: BingXi,
+    不使用OpenReceiveChannel,CloseRecvChannel,OpenRecvChannelACK作为关键信息。
+    使用   StartMediaTransmission, StopMediaTransmission, 
+      StartMediaTransmissionACK三个关键。
+      在以上6个passThruPartyID这个ID，用于标记这些报文是一个流程里的。
+
+Modify 2: 一个Callreference 可以有多个以passThruPartyID为key的mdeia.
+这些Media都要侦听，
+所以我们要先以Callid为key，做一个callid的Callidsession的listHead.
+在每一个CallidSession里，还以passThruPartyID为key的listHead.
+
+Modify 3: Media的stop是stopMedia的报文。
+          Callreference的stop则是以callstate报文里的OnHook
+          或是以DefineTimeDate
+
+          Callstate的conected表示CallReference的所有media全连接成功（一般只有一个）
+          
+*/  
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pcap.h>
@@ -46,7 +69,7 @@ extern struct config_st g_config;
 
 typedef struct _value_string {
     unsigned int      value;
-    const char		 *strptr;
+    const char     *strptr;
 } value_string;
 
 
@@ -138,7 +161,7 @@ static const value_string message_id[] = {
   { 0x0091, "SpeedDialStatRes" },
   { 0x0092, "LineStatRes" },
   { 0x0093, "ConfigStatRes" },
-  { 0x0094, "TimeDateRes" },//---------liudan å–å¾—æ—¶é—´ã€‚
+  { 0x0094, "TimeDateRes" },//---------liudan ??–??—?—?é—′?€?
   { 0x0095, "StartSessionTransmission" },
   { 0x0096, "StopSessionTransmission" },
   { 0x0097, "ButtonTemplateRes" },
@@ -277,10 +300,10 @@ typedef struct _skinny_opcode_map_t {
 
 /******************************************
 *
-* æœ¬æ–‡ä»¶çš„ç¨‹åºä¸»è¦æ˜¯ç”¨æ¥æŠ“ SKINNY æŠ¥æ–‡ã€‚
-* æœ¬ç¨‹åºæŠ“sipçš„æŠ¥æ–‡ï¼Œå¹¶è§£æžå‡ºsipé‡Œçš„call-id,ä»¥æ­¤ä½œä¸ºkey,æŠŠpktçš„è¿‡ç¨‹æ”¾åˆ°
-ä¸€ä¸ªsessionä¸­ï¼Œsessionæ”¾åˆ°ä¸€ä¸ªå…¨å±€çš„é“¾è¡¨ä¸­ã€‚
-è·Ÿè¸ªæ¯ä¸ªsessionçš„ä»Žç”Ÿåˆ°æ­»çš„è¿‡ç¨‹ã€‚æœ€åŽfree session.
+* ????–????????¨??o????è|???ˉ?”¨??￥??“ SKINNY ??￥?–??€?
+* ????¨??o???“sip?????￥?–?????1?è§￡?????osipé?????call-id,??￥?-¤?????okey,???pkt???è???¨??”???°
+??€??asession??-???session?”???°??€??a?…¨?±€???é“?è?¨??-?€?
+è·?è?a?ˉ???asession???????”???°?-????è???¨??€???€???free session.
 
 * 
 *******************************************/
@@ -313,7 +336,7 @@ extern struct config_st g_config;
 
 
 struct skinny_frame_info {
-	u32 callRef;//callid;
+  u32 callRef;//callid;
 };
 
 
@@ -359,39 +382,143 @@ typedef unsigned short USHORT;
 
 char g_LineStatV2_lineDirNumber[128]={0};
 
-struct session_info* skinny_get_session(char* callid)
+//extern struct session_ctx_t sip_ctx;
+
+
+struct session_ctx_t skinny_ctx;
+
+void handle_default_function (skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
+    skinny_info_t* skinny_info);
+
+static struct skinny_callReference_info* skinny_new_session(void)
 {
-	struct session_info* ss=si_find_session(callid);
-	if(ss == NULL)
-	{
-	    return NULL;
-	    #if 0
-		ss = si_new_session();
-		if(ss ==NULL)
-			return NULL;
-		ss->call_id = strdup(callid);
-		if(ss->call_id == NULL){
-			si_del_session(ss);
-			return NULL;
-		}
-		#endif
-	}
-	return ss;
+    struct skinny_callReference_info* skinny_callRefer_info =NULL;
+    skinny_callRefer_info = (struct skinny_callReference_info*)malloc(sizeof(struct skinny_callReference_info));
+    if ( skinny_callRefer_info == NULL)
+        return NULL;
+    memset(skinny_callRefer_info,0,sizeof(struct skinny_callReference_info));
+    INIT_LIST_HEAD(&skinny_callRefer_info->skinny_media_list);
+    pthread_mutex_lock(&skinny_ctx.head_lock);
+    list_add(&skinny_callRefer_info->node,&skinny_ctx.si_head);
+    pthread_mutex_unlock(&skinny_ctx.head_lock);
+    return skinny_callRefer_info;
 }
-static  struct session_info* skinny_get_session_by_callRef(u32 callReference)
+void skinny_del_session(struct skinny_callReference_info* si)
 {
-	
-	struct session_info* ss;
-	char callid[64]={0};
-	
-	sprintf(callid,"%d",callReference);
-	    
-	ss = skinny_get_session(callid);
-	if(ss ==  NULL)
+    pthread_mutex_lock(&skinny_ctx.head_lock);
+    //FREE(si->call_id);
+    list_del(&si->node);
+    pthread_mutex_unlock(&skinny_ctx.head_lock);
+    FREE(si);
+    return;
+}
+struct skinny_callReference_info* skinny_find_session(u32 call_id)
+{
+    struct skinny_callReference_info* p;
+    struct skinny_callReference_info* n;
+    struct list_head* si_head;
+    si_head = &skinny_ctx.si_head;
+    
+    list_for_each_entry_safe(p,n,si_head,node)
+    {
+
+        //if(!strcmp(call_id,p->call_id))
+        if(call_id == p->call_id)
+        {
+        
+            //skinny_log("find callid %s\n",call_id);
+            return p;
+        }
+    }
+    
+    skinny_log("ERROR: nofind callid %u\n",call_id);
+    return NULL;
+}
+
+
+
+static skinny_media_info* __skinny_new_media(struct skinny_callReference_info* skinny_callRefer)
+{
+    skinny_media_info* sm =NULL;
+    sm = (skinny_media_info*)malloc(sizeof(skinny_media_info));
+    if ( sm == NULL)
+        return NULL;
+    memset(sm,0,sizeof(skinny_media_info));
+   // pthread_mutex_lock(&sip_ctx.head_lock);
+    list_add(&sm->node,&skinny_callRefer->skinny_media_list);
+    //pthread_mutex_unlock(&sip_ctx.head_lock);
+    return sm;
+}
+void __skinny_del_media(skinny_callRefer* skinny_call, skinny_media_info* sm)
+{
+   
+
+    list_del(&sm->node);
+    
+    FREE(sm);
+    return;
+}
+skinny_media_info* __skinny_find_media(skinny_callRefer* skinny_call, u32 passThruPartyID)
+{
+    skinny_media_info* p;
+    skinny_media_info* n;
+    struct list_head* si_head;
+    si_head = &skinny_call->skinny_media_list;
+    
+    list_for_each_entry_safe(p,n,si_head,node)
+    {
+
+        //if(!strcmp(passThruPartyID,p->passThruPartyID))
+        if(passThruPartyID ==p->passThruPartyID)
+        {
+        
+            //skinny_log("find passThruPartyID %s\n",passThruPartyID);
+            return p;
+        }
+    }
+    
+    skinny_log("ERROR: nofind callid %u at skinnyCallRefencee %u \n",passThruPartyID,skinny_call->call_id);
+    return NULL;
+}
+
+void __skinny_foreach_media_list(struct skinny_callReference_info* skinny_callRefer_info,
+	void(*func)( skinny_media_info* n,struct skinny_callReference_info* skinny_callRefer_info))
+{
+	skinny_media_info* p;
+    skinny_media_info* n;
+	struct list_head* si_head;
+	si_head = &skinny_callRefer_info->skinny_media_list;
+
+	list_for_each_entry_safe(p,n,si_head,node)
 	{
-		skinny_log_err("no this callid %s session\n",callid);
+		
+		func(n,skinny_callRefer_info);
 	}
-	return ss;
+
+}
+
+struct skinny_callReference_info* skinny_get_session(u32 callid)
+{
+  struct skinny_callReference_info* skinny_callRefer_info=skinny_find_session(callid);
+  if(skinny_callRefer_info == NULL)
+  {
+      return NULL;
+  }
+  return skinny_callRefer_info;
+}
+static  struct skinny_callReference_info* skinny_get_session_by_callRef(u32 callReference)
+{
+  
+  struct skinny_callReference_info* skinny_callRefer_info;
+  
+  //sprintf(callid,"%d",callReference);
+      
+  skinny_callRefer_info = skinny_get_session(callReference);
+  if(skinny_callRefer_info ==  NULL)
+  {
+    skinny_log_err("no this callid %u session\n",callReference);
+  }
+  return skinny_callRefer_info;
 }
 /*------------------------------------------------*/
 typedef struct qualifierOut_st
@@ -402,26 +529,52 @@ typedef struct qualifierOut_st
     u32 any_compressionType;
 }qualifierOut;
 
-
-void close_skinny_session_by_StrCallid(char* callid)
+void close_skinny_media(skinny_media_info* sm,
+	struct skinny_callReference_info* skinny_callRefer_info)
+{
+	
+        close_rtp_sniffer(sm->passThruPartyID);
+        __skinny_del_media(skinny_callRefer_info,sm);
+}
+void close_skinny_session_by_Callid(u32 callid)
 {
 
-	struct session_info* ss;
+  struct skinny_callReference_info* skinny_callRefer_info;
 
-    ss = skinny_get_session(callid);
-    if(ss)
+    skinny_callRefer_info = skinny_get_session(callid);
+    if(skinny_callRefer_info)
     {
-        close_rtp_sniffer(ss);
-        si_del_session(ss);
+    	__skinny_foreach_media_list(skinny_callRefer_info,close_skinny_media);
         
     }
     else
     {
-        skinny_log_err("no this callid %s session\n",callid);
+        skinny_log_err("no this callid %u session\n",callid);
         //exit(0);
     }
 
 }
+void close_skinny_media_by_PartyID(struct skinny_callReference_info* skinny_callRefer_info,u32 passThruPartyID)
+{
+
+  
+	skinny_media_info* sm;
+
+    sm = __skinny_find_media(skinny_callRefer_info,passThruPartyID);
+    if(sm)
+    {
+        close_rtp_sniffer(sm->passThruPartyID);
+        __skinny_del_media(skinny_callRefer_info,sm);
+        
+    }
+    else
+    {
+        skinny_log_err("no this passThruPartyID %u Media\n",passThruPartyID);
+        //exit(0);
+    }
+
+}
+
 /* all session 's end is clearPromptStatus 2018-5-6 */
 void handle_clear_prompt_status(skinny_opcode_map_t* skinny_op, 
                     u8* msg,u32 len,
@@ -435,49 +588,36 @@ void handle_clear_prompt_status(skinny_opcode_map_t* skinny_op,
     CW_LOAD_U32(callRefer,p);
     skinny_log("enter\n");
     skinny_info->callid = callRefer;
-    return;
-/*
-    struct session_info* ss;
-    ss = skinny_get_session_by_callRef(callRefer);
-    if(ss)
-        close_rtp_sniffer(ss);
-    else
-        skinny_log(" Not find this callrefer %d  \n",callRefer);
-*/
-}
-#if 0
-void handle_stop_media_transmission(skinny_opcode_map_t* skinny_op, 
-                    u8* msg,u32 len,
-                    skinny_info_t* skinny_info)
-{
-    u8* p = msg;
-    u32 conferenceID;
-    u32 passThruPartyID;
-    u32 callRefer;
-    u32 portHandlingFlag;
-    
-    CW_LOAD_U32(conferenceID,p);
-    CW_LOAD_U32(passThruPartyID,p);
-    CW_LOAD_U32(callRefer,p);
-    CW_LOAD_U32(portHandlingFlag,p);
+   
 
-    struct session_info* ss;
-    ss = skinny_get_session_by_callRef(callRefer);
-    if(ss)
-        close_rtp_sniffer(ss);
-    else
-        skinny_log(" Not find this callrefer %d  \n",callRefer);
+	close_skinny_session_by_Callid(callRefer);
+
 }
 
-#endif
-
-void __start_rtp_sinnfer(struct session_info* ss)
+void __start_media_rtp_sniffer(skinny_media_info* sm,
+	struct skinny_callReference_info* skinny_callRefer_info)
 {
-    if((ss->called.ip.s_addr !=0)
-		&&(ss->calling.ip.s_addr !=0)
-		&&(ss->skinny_callstate_connected == 1))
-	        ss->rtp_sniffer_tid = setup_rtp_sniffer(ss);
 
+	
+    sm->session_comm_info.mode = skinny_callRefer_info->mode;
+    if(skinny_callRefer_info->called_group_number[0] != 0)
+    {
+    	strncpy(sm->session_comm_info.called_group_number,
+    	skinny_callRefer_info->called_group_number,
+    	sizeof(sm->session_comm_info.called_group_number));
+    	skinny_log("start rtp sniffer and skinny find the group number <%s> \n",
+    		sm->session_comm_info.called_group_number);
+    }
+    if((sm->session_comm_info.called.ip.s_addr !=0)
+    	&&(sm->session_comm_info.calling.ip.s_addr !=0)
+    	&&(skinny_callRefer_info->skinny_callstate_connected == 1))
+	{
+    	sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
+    }
+}
+void __start_rtp_sniffer(struct skinny_callReference_info* skinny_callRefer_info)
+{
+	__skinny_foreach_media_list(skinny_callRefer_info, __start_media_rtp_sniffer);
 
 }
 
@@ -499,7 +639,8 @@ void handle_start_media_transmission(skinny_opcode_map_t* skinny_op, u8* msg,u32
     qualifierOut qualifier_out;
 //    u32 callRefer;
     
-    struct session_info* ss;
+    struct skinny_callReference_info* skinny_callRefer_info;
+    skinny_media_info* sm;
     skinny_log("enter\n");
     
     CW_LOAD_U32(conferenceID,p);
@@ -518,134 +659,156 @@ void handle_start_media_transmission(skinny_opcode_map_t* skinny_op, u8* msg,u32
     CW_LOAD_U32(qualifier_out.any_compressionType,p);
     
     CW_LOAD_U32(callRefer,p);
-    skinny_log("_-_-_----------- callrefer %d , Port %d  remoteIP %x \n",
+    skinny_log("_-_-_----------- callrefer %u , Port %d  remoteIP %x \n",
         callRefer,remotePort,remoteIpv4Address);
 
     skinny_info->callid = callRefer;
 
-    ss = skinny_get_session_by_callRef(callRefer);
-	if(ss)
-	{
-	    if(ss->mode == SS_MODE_CALLING)
-	    {
-	    
-             skinny_log("_-_-_-----I am master ------ callrefer %d , Port %d  remoteIP beijiao %x \n",
+    skinny_callRefer_info = skinny_get_session_by_callRef(callRefer);
+    if(skinny_callRefer_info)
+    {
+    	sm =  __skinny_new_media(skinny_callRefer_info);
+    	if(!sm)
+    	{
+    		skinny_log_err("create new media failed\n");
+    		goto END;
+    	}
+    	sm->passThruPartyID = passThruPartyID;
+    	sm->pfather = skinny_callRefer_info;
+    
+      if(skinny_callRefer_info->mode == SS_MODE_CALLING)
+      {
+      
+          skinny_log("_-_-_-----I am master ------ callrefer %d , Port %d  remoteIP beijiao %x \n",
             callRefer,remotePort,remoteIpv4Address);
-	        ss->called.ip.s_addr = remoteIpv4Address;
-	        ss->called.port = (remotePort);
-	    }
-	    else
-	    {     skinny_log("_-_-_-----I am slave, ------ callrefer %d , Port %d  remoteIP is zhujiao %x \n",
+          sm->session_comm_info.called.ip.s_addr = remoteIpv4Address;
+          sm->session_comm_info.called.port = (remotePort);
+      }
+      else
+      {     skinny_log("_-_-_-----I am slave, ------ callrefer %d , Port %d  remoteIP is zhujiao %x \n",
             callRefer,remotePort,remoteIpv4Address);
-	
-	        ss->calling.ip.s_addr = remoteIpv4Address;
-	        ss->calling.port = (remotePort);
-	    }
-	    __start_rtp_sinnfer(ss);
-	}
-	else
-	{
-	    skinny_log_err("not find this callid %d \n",callRefer);
-	}
-	
+  
+          sm->session_comm_info.calling.ip.s_addr = remoteIpv4Address;
+          sm->session_comm_info.calling.port = (remotePort);
+      }
+     // __start_rtp_sniffer(ss);
+    }
+    else
+    {
+      skinny_log_err("not find this callid %u \n",callRefer);
+    }
+ END:
+ 	return;
 }
-
-/* Ë¼¿Æ»°»ú¸æËßcenter ×Ô¼ºµÄip+port. */
-void handle_open_receive_channel_ack(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
-                    skinny_info_t* skinny_info)
+  /* 2019-1-26 BingXi */      
+void handle_startMediaTransmissionACK(
+  skinny_opcode_map_t* skinny_op, 
+  u8* msg,
+  u32 len,
+  skinny_info_t* skinny_info)
 {
     u8* p = msg;
-    u32 openRecvChannelstatus;
-    u32 ipv4orv6;
+    u32 conferenceID;
+    u32 passThruPartyID; //同个channel里的ID。
+    u32 callReference;
+    u32 Ipv4or6;
     u32 ipv4Address;
-    u32 Port;
-    /* ext info:  */
-    u32 passThruPartyID;
-    u32 callRefer;
-    struct session_info* ss;
+    u32 Port;//transmitPort
+    u32 startMediaTransmissionStatus = 0;
+
+    struct skinny_callReference_info* skinny_callRefer_info;
+    skinny_media_info* sm;
     
-    skinny_log("enter\n");
-    CW_LOAD_U32(openRecvChannelstatus,p);
-    CW_LOAD_U32(ipv4orv6,p);
-    CW_LOAD_U32(ipv4Address,p);
-    p+=12;
-    CW_LOAD_U32(Port,p);
+    CW_LOAD_U32(conferenceID,p);
     CW_LOAD_U32(passThruPartyID,p);
-    CW_LOAD_U32(callRefer,p);
-    skinny_log("_-_-_----------- callrefer %d , Port %d ipv4Address %x \n",
-    callRefer,Port,ipv4Address);
-    
-    skinny_info->callid = callRefer;
-	ss = skinny_get_session_by_callRef(callRefer);
-	if(ss)
-	{
-	    if(ss->mode == SS_MODE_CALLING){
-	    
-        skinny_log("_-_-_-----I am master ------ callrefer %d , Port %d zhujiao ipv4Address %x \n",
-                    callRefer,Port,ipv4Address);
-	        ss->calling.ip.s_addr = ipv4Address;
-	        ss->calling.port = (Port);
-	    }
-	    else
-	    {
-	    
+    CW_LOAD_U32(callReference,p);
+    CW_LOAD_U32(Ipv4or6,p);
+  
+    CW_LOAD_U32(ipv4Address,p);
+    p += 12; // FOR IPV6'S SIZE'
+    skinny_log("--enter \n");
+    CW_LOAD_U32(Port,p);    
+    CW_LOAD_U32(startMediaTransmissionStatus,p);
+    skinny_callRefer_info = skinny_get_session_by_callRef(callReference);
+    if(skinny_callRefer_info)
+    {   	
+    	sm =  __skinny_new_media(skinny_callRefer_info);
+    	if(!sm)
+    	{
+    		skinny_log_err("create new media failed\n");
+    		goto END;
+    	}
+    	
+    	sm->passThruPartyID = passThruPartyID;
+    	sm->pfather = skinny_callRefer_info;
+    	
+      if(skinny_callRefer_info->mode == SS_MODE_CALLING){
+      
+        skinny_log("_-_-_-----I am master ------ callrefer %d , Port %d zhijiao ipv4Address %x \n",
+                    callReference,Port,ipv4Address);
+          sm->session_comm_info.calling.ip.s_addr = ipv4Address;
+          sm->session_comm_info.calling.port = (Port);
+      }
+      else
+      {
+      
             skinny_log("_-_-_-----I am slave ------ callrefer %d , Port %d beijiao ipv4Address %x \n",
-            callRefer,Port,ipv4Address);
+            callReference,Port,ipv4Address);
 
-	        ss->called.ip.s_addr = ipv4Address;
-	        ss->called.port = (Port);
-	    }
-	    __start_rtp_sinnfer(ss);
-	}	
-	else
-	{
-	    skinny_log_err("not find this callid %d \n",callRefer);
-	}
-    
-}
+          sm->session_comm_info.called.ip.s_addr = ipv4Address;
+          sm->session_comm_info.called.port = (Port);
+      }
+      sm->session_comm_info.mode = skinny_callRefer_info->mode;
+      __start_rtp_sniffer(skinny_callRefer_info);
+    } 
+    else
+    {
+      skinny_log_err("not find this callid %u \n",callReference);
+    }
 
-#if 0
-/* get media_payload  souceip, source port ipaddrType (v4 or v6) */
-void handle_open_receive_channel(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
-                    skinny_info_t* skinny_info)
-{
+ END:
+ 	return;
+ }
+ void handle_StopMediaTransmission(
+  skinny_opcode_map_t* skinny_op, 
+  u8* msg,
+  u32 len,
+  skinny_info_t* skinny_info)
+ {
     u8* p = msg;
-    u32 conference_id,passthruPartyID,millisecond_packet_size,compression_type;
-    u32 qualifer_in[2];
-    u32 call_refer;
-    char mRxMediaEncryptionKeyInfo[48];
-    u32 streamPassThroughID,associatedStreadID,RFC2833PayloadType,dtmfType,mixingMode,partyDirection;
-    u32 ipv4or6,sourceIpAddr,sourcePortNumber;
-    CW_LOAD_U32(conference_id,p);
-    CW_LOAD_U32(passthruPartyID,p);
-    CW_LOAD_U32(millisecond_packet_size,p);
-    CW_LOAD_U32(compression_type,p);
-    if(compression_type == 6) 
-        skinny_log(" Media_payload_g722_64k \n");
+    u32 conferenceID;
+    u32 passThruPartyID; //同个channel里的ID。
+    u32 callReference;
+    u32 portHandingFlag;
 
+    char callid[32] = {0};
+    //struct skinny_callReference_info* skinny_callRefer_info;
+        
+    skinny_log("close the callid \n");
+    CW_LOAD_U32(conferenceID,p);
+    CW_LOAD_U32(passThruPartyID,p);
+    CW_LOAD_U32(callReference,p);
+    CW_LOAD_U32(portHandingFlag,p);
     
-    CW_LOAD_U32(qualifer_in[0],p);
-    CW_LOAD_U32(qualifer_in[1],p);
-    CW_LOAD_U32(call_refer,p);
-    CW_LOAD_STR(mRxMediaEncryptionKeyInfo,p,48);
-    
-    CW_LOAD_U32(streamPassThroughID,p);
-    CW_LOAD_U32(associatedStreadID,p);
-    CW_LOAD_U32(RFC2833PayloadType,p);
-    CW_LOAD_U32(dtmfType,p);
-    
-    CW_LOAD_U32(mixingMode,p);
-    CW_LOAD_U32(partyDirection,p);
-    CW_LOAD_U32(ipv4or6,p);
-    CW_LOAD_U32(sourceIpAddr,p);
-    CW_LOAD_U32(sourcePortNumber,p);
-    
-    
-    
+    sprintf(callid,"%u",callReference);
+    skinny_log("close the callid(%u) \n",callReference);
+    close_skinny_session_by_Callid(callReference);
+ }
+
+void handle_open_receive_channel_ack(
+	skinny_opcode_map_t* skinny_op, 
+		u8* msg,
+		u32 len,
+        skinny_info_t* skinny_info)
+{
+
+  handle_default_function(skinny_op,msg,len,skinny_info);
 }
-#endif
 
-void cul_skinny_start_time(struct session_info* ss, struct tm* t)
+#if 1
+#if 0
+/* 当时由于taped没有ntp服务，只好从报文里取出时钟时间，再计算出通话的开始时间。 */
+void cul_skinny_start_time(struct skinny_callReference_info* ss, struct tm* t)
 {
     time_t a;
     time_t now;
@@ -658,43 +821,46 @@ void cul_skinny_start_time(struct session_info* ss, struct tm* t)
     memcpy(&ss->ring_time,tt,sizeof(struct tm));
     skinny_log(" I get time: acstime %s  \n",asctime(tt));
 }
-
+#endif
 void check_all_session_is_callstate_onhook(struct tm* t)
 {
-    extern struct session_ctx_t sip_ctx;
-    struct session_info* p;
-    struct session_info* n;
+    struct skinny_callReference_info* p;
+    struct skinny_callReference_info* n;
     struct list_head* si_head;
-    si_head = &sip_ctx.si_head;
+    si_head = &skinny_ctx.si_head;
     
     list_for_each_entry_safe(p,n,si_head,node)
     {
 
-        if(p->skinny_state == 2)
+        if(p->skinny_state == SKINNY_CALLSTATE_ONHOOK)
         {
-            cul_skinny_start_time(p,t);
-            skinny_log("this callid %s session is onhook, I will close it.\n",p->call_id);
-            close_skinny_session_by_StrCallid(p->call_id);
+            //cul_skinny_start_time(p,t);
+            skinny_log("this callid %u session is onhook, I will close it.\n",p->call_id);
+            close_skinny_session_by_Callid(p->call_id);
 
         }
     }
     
 }
 
-void handle_default_TimeDate(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
-                    skinny_info_t* skinny_info)
+void handle_default_TimeDate(
+    skinny_opcode_map_t* skinny_op, 
+    u8* msg,
+    u32 len,
+    skinny_info_t* skinny_info)
 {
 
-	struct tm t;
-	char ring_time[256]={0};
-	int wMilliseconds;
-	time_t system_time;
-	u8* p = msg;
-	char callid[32]={0};
-	struct session_info* ss ;
-	
-    skinny_log("enter\n");
-    
+  struct tm t;
+  char ring_time[256]={0};
+  int wMilliseconds;
+  time_t system_time;
+  u8* p = msg;
+  //char callid[32]={0};
+  struct skinny_callReference_info* skinny_callRefer_info ;
+  
+    skinny_log("enter and return doNothing \n");
+   return; //2019-1-26
+   
    memset(&t,0,sizeof(struct tm));
    CW_LOAD_U32(t.tm_year,p);
    CW_LOAD_U32(t.tm_mon,p);
@@ -729,49 +895,50 @@ void handle_default_TimeDate(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     }
     else
     {
-	
-	
-	    ss = skinny_get_session_by_callRef(skinny_info->callid);
-    	if(ss)
-    	{
-    	    cul_skinny_start_time(ss,&t);
-    	    
-            skinny_log("I will close this skinny %d\n",skinny_info->callid);
-            sprintf(callid,"%d",skinny_info->callid);
-        	close_skinny_session_by_StrCallid(callid);
-    	    
-    	}
-    	else
-    	{
-    		skinny_log_err("no this callid %s session\n",skinny_info->callid);
-    	    //exit(0);
-    	}
+  
+  
+      skinny_callRefer_info = skinny_get_session_by_callRef(skinny_info->callid);
+      if(skinny_callRefer_info)
+      {
+         // cul_skinny_start_time(ss,&t);
+          
+          skinny_log("I will close this skinny %u \n",skinny_info->callid);
+          ///  sprintf(callid,"%d",skinny_info->callid);
+          close_skinny_session_by_Callid(skinny_info->callid);
+          
+      }
+      else
+      {
+        skinny_log_err("no this callid %u session\n",skinny_info->callid);
+          //exit(0);
+      }
         
-	}
+  }
 }
+#endif
 #if 0
 handle_prompt_status_v2(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
                             skinny_info_t* skinny_info)
 {
-	u8* p = msg;
-	u32 timeOutValue;
-	u32 lineInstance;
-	u32 callReference;
-	char* prompt_status;
+  u8* p = msg;
+  u32 timeOutValue;
+  u32 lineInstance;
+  u32 callReference;
+  char* prompt_status;
     int prompt_status_len;
     int msessag_id_len = 4;
-	
-	struct session_info* ss;
-	
-	char callid[64]={0};
-	
+  
+  struct skinny_callReference_info* ss;
+  
+  char callid[64]={0};
+  
     skinny_log("enter\n");
-	CW_LOAD_U32(timeOutValue,p);
-	CW_LOAD_U32(lineInstance,p);
-	CW_LOAD_U32(callReference,p);
+  CW_LOAD_U32(timeOutValue,p);
+  CW_LOAD_U32(lineInstance,p);
+  CW_LOAD_U32(callReference,p);
 
-	prompt_status_len = len - msessag_id_len - 3*4;
-	
+  prompt_status_len = len - msessag_id_len - 3*4;
+  
 
 }
 #endif
@@ -803,285 +970,259 @@ void handle_CallState(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
 {
 
     
-	u8* p = msg;
-	u32 callState;
-	u32 lineInstance;
-	u32 callReference;
+  u8* p = msg;
+  u32 callState;
+  u32 lineInstance;
+  u32 callReference;
 
-	
-	struct session_info* ss;
-	
-	char callid[64]={0};
-	
+  
+  skinny_callRefer* skinny_callRefer_info;
+  
+  
     skinny_log("enter\n");
-	CW_LOAD_U32(callState,p);
-	CW_LOAD_U32(lineInstance,p);
-	CW_LOAD_U32(callReference,p);
+  CW_LOAD_U32(callState,p);
+  CW_LOAD_U32(lineInstance,p);
+  CW_LOAD_U32(callReference,p);
 
-	
+  
     skinny_info->callid = callReference;
-	sprintf(callid,"%d",callReference);
 
-    skinny_log("enter callid %d\n",callid);
-
-    ss=si_find_session(callid);
-    if(ss == NULL)
+    skinny_callRefer_info=skinny_find_session(callReference);
+    if(skinny_callRefer_info == NULL)
     {
-        ss = si_new_session();
-        if(ss ==NULL)
+        skinny_callRefer_info = skinny_new_session();
+        if(skinny_callRefer_info ==NULL)
             return;
-        ss->call_id = strdup(callid);
-        if(ss->call_id == NULL){
-            si_del_session(ss);
-            return;
-        }
+   		skinny_callRefer_info->call_id = callReference;
     }
 
-	if(ss ==  NULL)
-	{
-		skinny_log_err("no this callid %s session\n",callid);
-		return;
-	}
-	ss->skinny_state = callState;
-	if(callState == SKINNY_CALLSTATE_RING_IN)//ring in;
-	{
-	
-	    ss->mode = SS_MODE_CALLED;
-	    skinny_log(" I am ringin callstate ,so I am called. \n");
-	    
-	}
+    skinny_log("enter callid %u\n",callReference);
+
+  if(skinny_callRefer_info ==  NULL)
+  {
+    skinny_log_err("no this callid %u session\n",callReference);
+    return;
+  }
+  skinny_callRefer_info->skinny_state = callState;
+  if(callState == SKINNY_CALLSTATE_RING_IN)//ring in;
+  {
+  
+      skinny_callRefer_info->mode = SS_MODE_CALLED;
+      skinny_log(" I am ringin callstate ,so I am called. \n");
+      
+  }
     else if(callState == SKINNY_CALLSTATE_Proceed)//Proceed
     {
-	    ss->mode = SS_MODE_CALLING;
-	    skinny_log(" I am process callstate ,so I am calling. callReference %d \n",callReference);
-	    
+      skinny_callRefer_info->mode = SS_MODE_CALLING;
+      skinny_log(" I am process callstate ,so I am calling. callReference %d \n",callReference);
+      
+        
+    }
+    else if(callState == SKINNY_CALLSTATE_RING_OUT)//calling.
+    {
+      skinny_callRefer_info->mode = SS_MODE_CALLING;
+      skinny_log(" I am ring out callstate ,so I am calling. callReference %d \n",callReference);
+      
         
     }
     else if(callState == SKINNY_CALLSTATE_CONNECTED) //connected.
     {
-    	ss->skinny_callstate_connected = 1;
-		skinny_log(" process callstate Connected , I start the rtp sinnfer. callReference %d \n",callReference);
-	    __start_rtp_sinnfer(ss);
+      skinny_callRefer_info->skinny_callstate_connected = 1;
+      skinny_log(" process callstate Connected , I start the rtp sinnfer. callReference %d \n",callReference);
+      __start_rtp_sniffer(skinny_callRefer_info);
     }
     else
     {
-	    
-	    skinny_log(" I callstate %d . \n",callState);
+      
+      skinny_log(" I callstate %d . \n",callState);
     }
-	skinny_info->callstate = callState;
-	ss->skinny_state = callState;
-}                            
+  	skinny_info->callstate = callState;
+  	skinny_callRefer_info->skinny_state = callState;
+  
+    skinny_log("exit callid \n");
+} 
+
+void __update_rtp_session_number (
+    skinny_media_info* media_info,
+	struct skinny_callReference_info* skinny_callRefer_info)
+{
+	struct rtp_session_info* n;
+	
+	if(media_info->session_comm_info.rtp_sniffer_tid)
+	{
+		n = _rtp_find_session(media_info->session_comm_info.rtp_sniffer_tid);
+		if(n)
+		{
+			skinny_log("I(%u) update (%u)'s calling and called number \n",
+				pthread_self(),
+				media_info->session_comm_info.rtp_sniffer_tid);
+			strncpy(n->called.number, 
+			skinny_callRefer_info->called_number,
+			sizeof(n->called.number));
+			
+			strncpy(n->calling.number, 
+				skinny_callRefer_info->calling_number,
+				sizeof(n->calling.number));
+				
+			strncpy(n->called_group_number, 
+				skinny_callRefer_info->called_group_number,
+				sizeof(n->called_group_number));
+		}
+	}
+}
+
+/* 在这个函数执行时，rtp应该还没有建立起来。 */
+void update_rtp_session_number(struct skinny_callReference_info* skinny_callRefer_info)
+{
+
+	__skinny_foreach_media_list(skinny_callRefer_info,__update_rtp_session_number);
+}
+
+
+
+
 void handle_callinfo2_function(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     skinny_info_t* skinny_info)
 {
     
-	u8* p = msg;
-	u32 lineInstance;
-	u32 callReference;
-	u32 callType;
-	u32 originalCdpnRedirectReason;
-	u32 lastRedirect;
-	u32 callInstance;
-	u32 callSecurityStatus;
-	u32 partyPiRestrictionBits;
-	
-	char callingParty[33] = {0};
-	char AlternateCallingParty[33] = {0};	
-	char calledParty[33] = {0};
-	char originalCalledParty[33] = {0};
-	char lastRedirectingParty[33] = {0};
+  u8* p = msg;
+  u32 lineInstance;
+  u32 callReference;
+  u32 callType;
+  u32 originalCdpnRedirectReason;
+  u32 lastRedirect;
+  u32 callInstance;
+  u32 callSecurityStatus;
+  u32 partyPiRestrictionBits;
+  
+  char callingParty[33] = {0};
+  char AlternateCallingParty[33] = {0}; 
+  char calledParty[33] = {0};
+  char originalCalledParty[33] = {0};
+  char lastRedirectingParty[33] = {0};
 
-	char cgpnVoiceMailbox[128] = {0};
-	char cdpnVoiceMailbox[128] = {0};
-	char originalCdpnVoiceMailbox[128] = {0};
-	char lastRedirectingVoiceMailbox[128] = {0};
-	char callingPartyName[128] = {0};
-	char calledPartyName[128] = {0};
-	char originalCalledPartyName[128] = {0};
-	char lastRedirectingPartyName[128] = {0};
-	
-	char HuntPilotNumber[33] = {0};
+  char cgpnVoiceMailbox[128] = {0};
+  char cdpnVoiceMailbox[128] = {0};
+  char originalCdpnVoiceMailbox[128] = {0};
+  char lastRedirectingVoiceMailbox[128] = {0};
+  char callingPartyName[128] = {0};
+  char calledPartyName[128] = {0};
+  char originalCalledPartyName[128] = {0};
+  char lastRedirectingPartyName[128] = {0};
+  
+  char HuntPilotNumber[33] = {0};
 
-	//char* calling_number = NULL;
-	//char* called_number = NULL;
-	//char* AlternateCalling_number = NULL;
+  //char* calling_number = NULL;
+  //char* called_number = NULL;
+  //char* AlternateCalling_number = NULL;
 
-	
-	struct session_info* ss;
-	
-//	char callid[64]={0};
+  
+  struct skinny_callReference_info* skinny_callRefer_info;
+  
+//  char callid[64]={0};
 
     skinny_log("enter\n");
-	CW_LOAD_U32(lineInstance,p);
-	CW_LOAD_U32(callReference,p);
-	CW_LOAD_U32(callType,p);
-	
-	CW_LOAD_U32(originalCdpnRedirectReason,p);
-	CW_LOAD_U32(lastRedirect,p);
-	CW_LOAD_U32(callInstance,p);
-	CW_LOAD_U32(callSecurityStatus,p);
-	CW_LOAD_U32(partyPiRestrictionBits,p);
-	
+  CW_LOAD_U32(lineInstance,p);
+  CW_LOAD_U32(callReference,p);
+  CW_LOAD_U32(callType,p);
+  
+  CW_LOAD_U32(originalCdpnRedirectReason,p);
+  CW_LOAD_U32(lastRedirect,p);
+  CW_LOAD_U32(callInstance,p);
+  CW_LOAD_U32(callSecurityStatus,p);
+  CW_LOAD_U32(partyPiRestrictionBits,p);
+  
 
-	ss = skinny_get_session_by_callRef(callReference);
-    if(ss)
+  skinny_callRefer_info = skinny_get_session_by_callRef(callReference);
+    if(skinny_callRefer_info)
     {
 
 
     }
     else
     {
-        skinny_log_err("not find this callid %d \n",callReference);
+        skinny_log_err("not find this callid %u \n",callReference);
         return;
     }
-	LOAD_STR_LINE(p, callingParty, 32, 0);
-	LOAD_STR_LINE(p, AlternateCallingParty, 32, 0);	
-	LOAD_STR_LINE(p, calledParty, 32, 0);	
-	LOAD_STR_LINE(p, originalCalledParty, 32, 0);
-	LOAD_STR_LINE(p, lastRedirectingParty, 32, 0);
-	skinny_log("callingParty:<%s>\n",callingParty);
-	skinny_log("AlternateCallingParty:<%s>\n",AlternateCallingParty);
-	skinny_log("calledParty:<%s>\n",calledParty);
-	skinny_log("originalCalledParty:<%s>\n",originalCalledParty);
-	skinny_log("lastRedirectingParty:<%s>\n",lastRedirectingParty);
+  LOAD_STR_LINE(p, callingParty, 32, 0);
+  LOAD_STR_LINE(p, AlternateCallingParty, 32, 0); 
+  LOAD_STR_LINE(p, calledParty, 32, 0); 
+  LOAD_STR_LINE(p, originalCalledParty, 32, 0);
+  LOAD_STR_LINE(p, lastRedirectingParty, 32, 0);
+  skinny_log("callingParty:<%s>\n",callingParty);
+  skinny_log("AlternateCallingParty:<%s>\n",AlternateCallingParty);
+  skinny_log("calledParty:<%s>\n",calledParty);
+  skinny_log("originalCalledParty:<%s>\n",originalCalledParty);
+  skinny_log("lastRedirectingParty:<%s>\n",lastRedirectingParty);
 
-	if(ss->called.number[0] == 0)
-	{
-		strncpy(ss->called.number,calledParty,sizeof(ss->called.number));
-	}
-	else
-	{
-		if(0 ==strncmp(ss->called.number,calledParty,strlen(calledParty)))
-		{
-		
-		}
-		else
-		{
-			skinny_log("calledParty is changed from <%s> to <%s> \n",ss->called.number,calledParty);
-			if(ss->skinny_callstate_connected == 1)
-			{
-				skinny_log("callstate is connected, update the called number\n");
-				strncpy(ss->called_group_number,
-					ss->called.number,sizeof(ss->called_group_number));
-				/* update the new called number ....2018-12-3 */
-				strncpy(ss->called.number,calledParty,sizeof(ss->called.number));
-				
-			}
-		}
-	}
-	strncpy(ss->calling.number,callingParty,sizeof(ss->calling.number));
-	skinny_log("I get called number %s,calling number %s \n",
-    	ss->called.number,ss->calling.number);
-	
-	LOAD_STR_LINE(p, cgpnVoiceMailbox, 127, 0);
-	skinny_log("cgpnVoiceMailbox:<%s>\n",cgpnVoiceMailbox);
-	LOAD_STR_LINE(p, cdpnVoiceMailbox, 127, 0);
-	skinny_log("cdpnVoiceMailbox:<%s>\n",cdpnVoiceMailbox);
-	
-	LOAD_STR_LINE(p, originalCdpnVoiceMailbox, 127, 0);
-	skinny_log("originalCdpnVoiceMailbox:<%s>\n",originalCdpnVoiceMailbox);
-	
-	LOAD_STR_LINE(p, lastRedirectingVoiceMailbox, 127, 0);
-	skinny_log("lastRedirectingVoiceMailbox:<%s>\n",lastRedirectingVoiceMailbox);
-	
-	LOAD_STR_LINE(p, callingPartyName, 127, 0);
-	skinny_log("callingPartyName:<%s>\n",callingPartyName);
-	
-	LOAD_STR_LINE(p, calledPartyName, 127, 0);
-	skinny_log("calledPartyName:<%s>\n",calledPartyName);
-	
-	LOAD_STR_LINE(p, originalCalledPartyName, 127, 0);
-	skinny_log("originalCalledPartyName:<%s>\n",originalCalledPartyName);
-	LOAD_STR_LINE(p, lastRedirectingPartyName, 127, 0);
-	skinny_log("lastRedirectingPartyName:<%s>\n",lastRedirectingPartyName);
-	LOAD_STR_LINE(p, HuntPilotNumber, 127, 0);
-	skinny_log("HuntPilotNumber:<%s>\n",HuntPilotNumber);
-	
+  if(skinny_callRefer_info->called_number[0] == 0)
+  {
+    strncpy(skinny_callRefer_info->called_number,calledParty,sizeof(skinny_callRefer_info->called_number));
+  }
+  else
+  {
+    if(0 ==strncmp(skinny_callRefer_info->called_number,calledParty,strlen(calledParty)))
+    {
+    
+    }
+    else
+    {
+      skinny_log("calledParty is changed from <%s> to <%s> \n",skinny_callRefer_info->called_number,calledParty);
+      if(skinny_callRefer_info->skinny_callstate_connected == 1)
+      {
+        skinny_log("callstate is connected, update the called number\n");
+        strncpy(skinny_callRefer_info->called_group_number,
+          skinny_callRefer_info->called_number,sizeof(skinny_callRefer_info->called_group_number));
+        /* update the new called number ....2018-12-3 */
+        strncpy(skinny_callRefer_info->called_number,calledParty,sizeof(skinny_callRefer_info->called_number));
+        
+      }
+    }
+  }
+  strncpy(skinny_callRefer_info->calling_number,callingParty,sizeof(skinny_callRefer_info->calling_number));
+  skinny_log("I get called number %s,calling number %s \n",
+      skinny_callRefer_info->called_number,skinny_callRefer_info->calling_number);
+  
+  LOAD_STR_LINE(p, cgpnVoiceMailbox, 127, 0);
+  skinny_log("cgpnVoiceMailbox:<%s>\n",cgpnVoiceMailbox);
+  LOAD_STR_LINE(p, cdpnVoiceMailbox, 127, 0);
+  skinny_log("cdpnVoiceMailbox:<%s>\n",cdpnVoiceMailbox);
+  
+  LOAD_STR_LINE(p, originalCdpnVoiceMailbox, 127, 0);
+  skinny_log("originalCdpnVoiceMailbox:<%s>\n",originalCdpnVoiceMailbox);
+  
+  LOAD_STR_LINE(p, lastRedirectingVoiceMailbox, 127, 0);
+  skinny_log("lastRedirectingVoiceMailbox:<%s>\n",lastRedirectingVoiceMailbox);
+  
+  LOAD_STR_LINE(p, callingPartyName, 127, 0);
+  skinny_log("callingPartyName:<%s>\n",callingPartyName);
+  
+  LOAD_STR_LINE(p, calledPartyName, 127, 0);
+  skinny_log("calledPartyName:<%s>\n",calledPartyName);
+  
+  LOAD_STR_LINE(p, originalCalledPartyName, 127, 0);
+  skinny_log("originalCalledPartyName:<%s>\n",originalCalledPartyName);
+  LOAD_STR_LINE(p, lastRedirectingPartyName, 127, 0);
+  skinny_log("lastRedirectingPartyName:<%s>\n",lastRedirectingPartyName);
+  LOAD_STR_LINE(p, HuntPilotNumber, 127, 0);
+  skinny_log("HuntPilotNumber:<%s>\n",HuntPilotNumber);
+  
 /* sccp当被叫时，会有HuntPilotNumber，则把电话自己的号码放到called里。 */
 /* SCCP为主叫时，callinfov2里不会有HuntPilotNumber，
-但 前后callinfoV2的报文里 calledParty 会变化，由'组号' 变成 '组员的号码'。*/	
-	if(HuntPilotNumber[0] !=0)
-	{
-		skinny_log("Bingo, I get a huntPilotNumber, "
-			"and change the called number to phone number(%s)",g_LineStatV2_lineDirNumber);
-		if(g_LineStatV2_lineDirNumber[0] != 0)
-		{
-			strncpy(ss->called.number,g_LineStatV2_lineDirNumber,sizeof(ss->called.number));
-		}
-/* 把HuntPilotNumber放到called_group_number里，这是新增加的字体，会上报到平台。2018-12-3 */		
-		strncpy(ss->called_group_number,HuntPilotNumber,sizeof(ss->called_group_number));
-	}
-	update_rtp_session_number(ss);
-	return;
-#if 0    
-	if(callType == 2) //outBoundCall
-	{
-    	t = (char*)p;
-    	strncpy(ss->calling.number,t,sizeof(ss->calling.number));
-    	
-    	t+=strlen(t);
-    	
-    	if(*t == 0)
-    	    t++;
-    	
-    	if(*t == 0)
-    	    t++;
-    	    
-    	if(*t == 0)
-    	{
-    	    skinny_log_err("errir next t %s \n",++t);
-    	}
-    	else
-    	{
-    	    
-    	    strncpy(ss->called.number,t,sizeof(ss->called.number));
-    	    
-    	}
-	}
-	else if((callType == 1))//InBoundCall
-	{
-	    t = (char*)p;
-    	
-    	strncpy(ss->calling.number,t,sizeof(ss->calling.number));
-    	skinny_log("---- calling number %s \n",ss->calling.number);
-    	t+=strlen(t);
-    	
-    	if(*t == 0)
-    	    t++;
-    	
-    	if(*t == 0)
-    	    t++;
-    	if(*t == 0)
-    	{
-    	    skinny_log_err("error for lternateCalling, next t %s \n",++t);
-    	}
-    	else
-    	{
-	        printf("[%s:%d] debug\n",__func__,__LINE__);
-    	   // AlternateCalling_number = strdup(t);
-    	    t+=strlen(t);
-    	}
-
-    	if(*t == 0)
-    	    t++;
-    	 if(*t == 0)
-    	{
-    	    skinny_log_err("errir next t %s \n",++t);
-    	}
-    	else
-    	{
-    	 strncpy(ss->called.number,t,sizeof(ss->called.number));
-    	    
-    	    
-    	}   
-
-    	
-	}
-	else
-	{
-	    skinny_log_err("I don't know this call type %d \n",callType);
-	}
-#endif	
+但 前后callinfoV2的报文里 calledParty 会变化，由'组号' 变成 '组员的号码'。*/  
+  if(HuntPilotNumber[0] !=0)
+  {
+    skinny_log("Bingo, I get a huntPilotNumber, "
+      "and change the called number to phone number(%s)",g_LineStatV2_lineDirNumber);
+    if(g_LineStatV2_lineDirNumber[0] != 0)
+    {
+      strncpy(skinny_callRefer_info->called_number,g_LineStatV2_lineDirNumber,sizeof(skinny_callRefer_info->called_number));
+    }
+/* 把HuntPilotNumber放到called_group_number里，这是新增加的字体，会上报到平台。2018-12-3 */    
+    strncpy(skinny_callRefer_info->called_group_number,HuntPilotNumber,sizeof(skinny_callRefer_info->called_group_number));
+  }
+  update_rtp_session_number(skinny_callRefer_info);
+  return;
 
 }
 
@@ -1089,110 +1230,105 @@ void handle_DialedNumber(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
                             skinny_info_t* skinny_info)
 {
 	u8* p = msg;
-	struct session_info* ss;
+	struct skinny_callReference_info* skinny_callRefer_info;
 	char dailed_num[26]={0};
 	u32 line_instance=0;
-	
+
 	u32 callReference=0;
-	char callid[64]={0};
-	
-    skinny_log("enter\n");
+
+
+	skinny_log("enter\n");
 
 	CW_LOAD_STR(dailed_num,p,25);
-	
+
 	CW_LOAD_U32(line_instance,p);
 	CW_LOAD_U32(callReference,p);
-	sprintf(callid,"%d",callReference);
-	
-    skinny_info->callid = callReference;
-//	ss = skinny_get_session(callid);
-	
-    ss = si_new_session();
-    if(ss ==NULL)
-        return;
-    ss->call_id = strdup(callid);
-    if(ss->call_id == NULL){
-        si_del_session(ss);
-        return;
-    }
-	if(ss ==  NULL)
+
+	skinny_info->callid = callReference;
+
+	skinny_callRefer_info = skinny_new_session();
+	if(skinny_callRefer_info ==NULL)
+	    return;
+
+	skinny_callRefer_info->call_id = callReference;
+	if(skinny_callRefer_info ==  NULL)
 	{
-		skinny_log_err("no this callid %s session\n",callid);
+		skinny_log_err("no this callid %u session\n",callReference);
 		return;
 	}
-	ss->mode = SS_MODE_CALLING;
-	skinny_log("callid %s dailed number %s \n",callid,dailed_num);
-	
+	skinny_callRefer_info->mode = SS_MODE_CALLING;
+	skinny_log("callid %u dailed number %u \n",callReference,dailed_num);
+
 	return;
 }
 /* 在电话注册时，得到电话的号码。 */
 void handle_LineStateV2 (
-		skinny_opcode_map_t* skinny_op, 
-		u8* msg,u32 len,
-		skinny_info_t* skinny_info)
+    skinny_opcode_map_t* skinny_op, 
+    u8* msg,u32 len,
+    skinny_info_t* skinny_info)
 {
 
 
-	u8* p = msg;
+  u8* p = msg;
 
-	u32 lineNumber;
-	u32 lineType;
-	char lineDirNumber[33]={0};
-	char lineFullyQualifiedDisplayName[33]={0};
-	char lineTextLabel[33] = {0};
-	
-	CW_LOAD_U32(lineNumber,p);
-	CW_LOAD_U32(lineType,p);
-	
-	LOAD_STR_LINE(p, lineDirNumber, 32, 0);
-	LOAD_STR_LINE(p, lineFullyQualifiedDisplayName, 32, 0);
-	LOAD_STR_LINE(p, lineTextLabel, 32, 0);
-	skinny_log("lineNumber:%d\n",lineNumber);
-	skinny_log("lineType:%d\n",lineType);
-	skinny_log("lineDirNumber:%s\n",lineDirNumber);
-	skinny_log("lineFullyQualifiedDisplayName:%s\n",lineFullyQualifiedDisplayName);
+  u32 lineNumber;
+  u32 lineType;
+  char lineDirNumber[33]={0};
+  char lineFullyQualifiedDisplayName[33]={0};
+  char lineTextLabel[33] = {0};
+  
+  CW_LOAD_U32(lineNumber,p);
+  CW_LOAD_U32(lineType,p);
+  
+  LOAD_STR_LINE(p, lineDirNumber, 32, 0);
+  LOAD_STR_LINE(p, lineFullyQualifiedDisplayName, 32, 0);
+  LOAD_STR_LINE(p, lineTextLabel, 32, 0);
+  skinny_log("lineNumber:%u\n",lineNumber);
+  skinny_log("lineType:%u\n",lineType);
+  skinny_log("lineDirNumber:%s\n",lineDirNumber);
+  skinny_log("lineFullyQualifiedDisplayName:%s\n",lineFullyQualifiedDisplayName);
 
-	skinny_log("lineTextLabel:%s\n",lineTextLabel);
-	if(lineDirNumber[0] != 0)
-	{
-		if(g_LineStatV2_lineDirNumber[0] == 0)
-		{
-			skinny_log("init set  g_LineStatV2_lineDirNumber \n");
-			strncpy(g_LineStatV2_lineDirNumber,lineDirNumber,
-			sizeof(g_LineStatV2_lineDirNumber)-1);
-			
-		}
-		else
-		{
-			skinny_log(" g_LineStatV2_lineDirNumber's value <%s> \n",
-				g_LineStatV2_lineDirNumber);
-			if(!strncmp(g_LineStatV2_lineDirNumber,lineDirNumber,
-				strlen(g_LineStatV2_lineDirNumber)))	
-			{
-				skinny_log("g_LineStatV2_lineDirNumber == lineDirNumber, not update it \n");
-			}
-			else
-			{
-				skinny_log("g_LineStatV2_lineDirNumber != lineDirNumber, must update it \n");
-				
-				strncpy(g_LineStatV2_lineDirNumber,lineDirNumber,
-				sizeof(g_LineStatV2_lineDirNumber)-1);
-			}
-		}
-	}
-	else
-	{
-		skinny_log("not get lineDirNumber \n");
-	}
+  skinny_log("lineTextLabel:%s\n",lineTextLabel);
+  if(lineDirNumber[0] != 0)
+  {
+    if(g_LineStatV2_lineDirNumber[0] == 0)
+    {
+      skinny_log("init set  g_LineStatV2_lineDirNumber \n");
+      strncpy(g_LineStatV2_lineDirNumber,lineDirNumber,
+      sizeof(g_LineStatV2_lineDirNumber)-1);
+      
+    }
+    else
+    {
+      skinny_log(" g_LineStatV2_lineDirNumber's value <%s> \n",
+        g_LineStatV2_lineDirNumber);
+      if(!strncmp(g_LineStatV2_lineDirNumber,lineDirNumber,
+        strlen(g_LineStatV2_lineDirNumber)))  
+      {
+        skinny_log("g_LineStatV2_lineDirNumber == lineDirNumber, not update it \n");
+      }
+      else
+      {
+        skinny_log("g_LineStatV2_lineDirNumber != lineDirNumber, must update it \n");
+        
+        strncpy(g_LineStatV2_lineDirNumber,lineDirNumber,
+        sizeof(g_LineStatV2_lineDirNumber)-1);
+      }
+    }
+  }
+  else
+  {
+    skinny_log("not get lineDirNumber \n");
+  }
 }
-							
+              
 
 
 void handle_default_function (skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     skinny_info_t* skinny_info)
 {
-	skinny_log("%s and msg len %d  \n",skinny_op->name,len);
-	
+  skinny_log("%s and msg len %d  \n",skinny_op->name,len);
+  
 }
 
 /* Messages Handler Array */
@@ -1263,14 +1399,14 @@ static  skinny_opcode_map_t skinny_opcode_map[] = {
   {0x0088, handle_default_function                   , SKINNY_MSGTYPE_EVENT    , "SetSpeakerModeMessage"},
   {0x0089, handle_default_function                     , SKINNY_MSGTYPE_EVENT    , "SetMicroModeMessage"},
   {0x008a, handle_start_media_transmission           , SKINNY_MSGTYPE_REQUEST  , "StartMediaTransmissionMessage"},
-  {0x008b, handle_default_function   , SKINNY_MSGTYPE_EVENT    , "StopMediaTransmissionMessage"},
+  {0x008b, handle_StopMediaTransmission   , SKINNY_MSGTYPE_EVENT    , "StopMediaTransmissionMessage"},
   {0x008f, handle_default_function                         , SKINNY_MSGTYPE_EVENT    , "CallInfoMessage"},
   {0x0090, handle_default_function                   , SKINNY_MSGTYPE_RESPONSE , "ForwardStatResMessage"},
   {0x0091, handle_default_function                 , SKINNY_MSGTYPE_RESPONSE , "SpeedDialStatResMessage"},
   {0x0092, handle_default_function                      , SKINNY_MSGTYPE_RESPONSE , "LineStatResMessage"},
   {0x0093, handle_default_function                    , SKINNY_MSGTYPE_RESPONSE , "ConfigStatResMessage"},
-  //ä»ŽTimeDateResMessageé‡Œå–æ—¶é—´ã€‚
-  {0x0094, handle_default_TimeDate                      , SKINNY_MSGTYPE_RESPONSE , "TimeDateResMessage"},//---liudan
+  //???TimeDateResMessageé????–?—?é—′?€?
+  {0x0094, handle_default_function                      , SKINNY_MSGTYPE_RESPONSE , "TimeDateResMessage"},//---liudan
   {0x0095, handle_default_function         , SKINNY_MSGTYPE_EVENT    , "StartSessionTransmissionMessage"},
   {0x0096, handle_default_function          , SKINNY_MSGTYPE_EVENT    , "StopSessionTransmissionMessage"},
   {0x0097, handle_default_function                , SKINNY_MSGTYPE_RESPONSE , "ButtonTemplateResMessage"},
@@ -1304,7 +1440,7 @@ static  skinny_opcode_map_t skinny_opcode_map[] = {
   {0x011a, handle_default_function                                           , SKINNY_MSGTYPE_RESPONSE , "RegisterTokenAck"},
   {0x011b, handle_default_function                     , SKINNY_MSGTYPE_RESPONSE , "RegisterTokenReject"},
   {0x011c, handle_default_function       , SKINNY_MSGTYPE_EVENT    , "StartMediaFailureDetectionMessage"},
-  {0x011d, handle_DialedNumber                     , SKINNY_MSGTYPE_EVENT    , "DialedNumberMessage"}, //æåˆ°ç”¨æˆ·è¾“å…¥çš„å·ç ã€‚
+  {0x011d, handle_DialedNumber                     , SKINNY_MSGTYPE_EVENT    , "DialedNumberMessage"}, //?????°?”¨??·è?“?…￥?????·????€?
   {0x011e, handle_default_function                 , SKINNY_MSGTYPE_EVENT    , "UserToDeviceDataMessage"},
   {0x011f, handle_default_function                   , SKINNY_MSGTYPE_RESPONSE , "FeatureStatResMessage"},
   {0x0120, handle_default_function                 , SKINNY_MSGTYPE_EVENT    , "DisplayPriNotifyMessage"},
@@ -1357,7 +1493,7 @@ static  skinny_opcode_map_t skinny_opcode_map[] = {
   {0x0151, handle_default_function                        , SKINNY_MSGTYPE_EVENT    , "QoSModifyMessage"},
   {0x0152, handle_default_function              , SKINNY_MSGTYPE_RESPONSE , "SubscriptionStatResMessage"},
   {0x0153, handle_default_function                     , SKINNY_MSGTYPE_EVENT    , "NotificationMessage"},
-  {0x0154, handle_default_function        , SKINNY_MSGTYPE_RESPONSE , "StartMediaTransmissionAckMessage"},
+  {0x0154, handle_startMediaTransmissionACK        , SKINNY_MSGTYPE_RESPONSE , "StartMediaTransmissionAckMessage"},
   {0x0155, handle_default_function   , SKINNY_MSGTYPE_RESPONSE , "StartMultiMediaTransmissionAckMessage"},
   {0x0156, handle_default_function                  , SKINNY_MSGTYPE_EVENT    , "CallHistoryInfoMessage"},
   {0x0157, handle_default_function                     , SKINNY_MSGTYPE_EVENT    , "LocationInfoMessage"},
@@ -1377,62 +1513,62 @@ static  skinny_opcode_map_t skinny_opcode_map[] = {
 
 void handler_skinny_elements(u8* msg,int msg_size)
 {
-	u32 len;
-	u32 hdr_opcode;
-	u32 hdr_ver;
-	u8* p = msg;
-	u32 i;
-	u32 message_len = 0;
+  u32 len;
+  u32 hdr_opcode;
+  u32 hdr_ver;
+  u8* p = msg;
+  u32 i;
+  u32 message_len = 0;
     skinny_opcode_map_t* opcode_entry;
 
-	skinny_info_t skinny_info;
-	memset(&skinny_info,0,sizeof(skinny_info_t));
-	
-	while(p+12 < msg+msg_size)
-	{
-		CW_LOAD_U32(len,p);
-		CW_LOAD_U32(hdr_ver,p);
+  skinny_info_t skinny_info;
+  memset(&skinny_info,0,sizeof(skinny_info_t));
+  
+  while(p+12 < msg+msg_size)
+  {
+    CW_LOAD_U32(len,p);
+    CW_LOAD_U32(hdr_ver,p);
 
-		CW_LOAD_U32(hdr_opcode,p);
-		message_len = len -4;
-		skinny_log("len %x (%x) ver %x opcode %x\n",len,htonl(len),hdr_ver,hdr_opcode);
-		if(p+message_len <= msg+msg_size)
-		{
-			for (i = 0; i < sizeof(skinny_opcode_map)/sizeof(skinny_opcode_map_t) ; i++) 
-			{
-	    		if (skinny_opcode_map[i].opcode == hdr_opcode) 
-				{
-	     			 opcode_entry = &skinny_opcode_map[i];
-					 opcode_entry->handler(opcode_entry,p,len,&skinny_info);
-					 p+=message_len;
-					 break;
-	    		}
-  			}
-			
-		}
-		else
-			skinny_log_err("opcode %d msg broken!\n",hdr_opcode);
-			
-	}
+    CW_LOAD_U32(hdr_opcode,p);
+    message_len = len -4;
+    skinny_log("len %x (%x) ver %x opcode %x\n",len,htonl(len),hdr_ver,hdr_opcode);
+    if(p+message_len <= msg+msg_size)
+    {
+      for (i = 0; i < sizeof(skinny_opcode_map)/sizeof(skinny_opcode_map_t) ; i++) 
+      {
+          if (skinny_opcode_map[i].opcode == hdr_opcode) 
+        {
+             opcode_entry = &skinny_opcode_map[i];
+           opcode_entry->handler(opcode_entry,p,len,&skinny_info);
+           p+=message_len;
+           break;
+          }
+        }
+      
+    }
+    else
+      skinny_log_err("opcode %u msg broken!\n",hdr_opcode);
+      
+  }
 }
 void show_tcp_info(struct tcphdr* th )
 {
-	
-	skinny_log("tcp info :\n"
-				"source port %u, dest port %u\n "
-				"Sequence Number %u,Acknowledgement Number %u\n "
-				"head len %d byte (%d)\n"
-				"flags %s %s %s %s %s %s %s %s \n",
-			htons(th->source),htons(th->dest),ntohl(th->seq),          ntohl(th->ack_seq),
-				th->doff*4, th->doff,
-				th->fin?"Finish":"NoFinish",
-				th->syn?"Syn":"NoSyn",
-				th->rst?"Reset":"NoReset",
-				th->psh?"Push":"NoPush",
-				th->ack?"Ack":"NoAck",
-				th->urg?"Urgent":"NoUrgent",
-				th->ece?"ECN-ECHO":"NoECH-ECHO",
-				th->cwr?"Congestion_Window_Reduced":"NoCWR");
+  
+  skinny_log("tcp info :\n"
+        "source port %u, dest port %u\n "
+        "Sequence Number %u,Acknowledgement Number %u\n "
+        "head len %d byte (%d)\n"
+        "flags %s %s %s %s %s %s %s %s \n",
+      htons(th->source),htons(th->dest),ntohl(th->seq),          ntohl(th->ack_seq),
+        th->doff*4, th->doff,
+        th->fin?"Finish":"NoFinish",
+        th->syn?"Syn":"NoSyn",
+        th->rst?"Reset":"NoReset",
+        th->psh?"Push":"NoPush",
+        th->ack?"Ack":"NoAck",
+        th->urg?"Urgent":"NoUrgent",
+        th->ece?"ECN-ECHO":"NoECH-ECHO",
+        th->cwr?"Congestion_Window_Reduced":"NoCWR");
 }
 
 void dump_hex(u8* src,int len)
@@ -1451,101 +1587,103 @@ static void sniffer_handle_skinny(u_char * user, const struct pcap_pkthdr * pack
 {
     int ret = 0;
     
-	const struct pcap_pkthdr* phdr = packet_header;
-	struct iphdr* iph = NULL;
-	struct tcphdr* th = NULL;
-	u8* tcp_payload;
-	int tcp_payload_len;
-	int tcp_len;
-	
-	
-	skinny_log("\n\n");
-	ret = check_iphdr(phdr,packet_content,&iph);
-	if(ret != 0){
-		
-		skinny_log_err("check_iphdr error\n");
-		goto error;
+  const struct pcap_pkthdr* phdr = packet_header;
+  struct iphdr* iph = NULL;
+  struct tcphdr* th = NULL;
+  u8* tcp_payload;
+  int tcp_payload_len;
+  int tcp_len;
+  
+  
+  skinny_log("\n\n");
+  ret = check_iphdr(phdr,packet_content,&iph);
+  if(ret != 0){
+    
+    skinny_log_err("check_iphdr error\n");
+    goto error;
     }
-	if(0 != check_tcp(iph,&th))	{
-		
-		skinny_log_err("check_tcp error\n");
-		goto error;
-	}
-	
-    //send_sip_pkt(iph,udph);/* æŠŠsipæŠ¥æ–‡è½¬ç»™uploadä¸€ä»½ã€‚ */
+  if(0 != check_tcp(iph,&th)) {
+    
+    skinny_log_err("check_tcp error\n");
+    goto error;
+  }
+  
+    //send_sip_pkt(iph,udph);/* ???sip??￥?–?è?????upload??€????€? */
 
-	tcp_payload = ((u8*)th)+(th->doff * 4);
-	tcp_len = ntohs(iph->tot_len)- iph->ihl*4;
-	tcp_payload_len = tcp_len - (th->doff * 4);
-	show_tcp_info(th);
-	if(tcp_payload_len == 0)
-	{
-		skinny_log("this frame no tcp payload\n\n");
-		return;
-	}
-	
-	skinny_log("tcp_payload %p, tcp_payload_len  %d th %p \n",tcp_payload,
-	    tcp_payload_len,th);
-	//dump_hex(tcp_payload,tcp_payload_len);
-	handler_skinny_elements(tcp_payload,tcp_payload_len);
-	
+  tcp_payload = ((u8*)th)+(th->doff * 4);
+  tcp_len = ntohs(iph->tot_len)- iph->ihl*4;
+  tcp_payload_len = tcp_len - (th->doff * 4);
+  show_tcp_info(th);
+  if(tcp_payload_len == 0)
+  {
+    skinny_log("this frame no tcp payload\n\n");
+    return;
+  }
+  
+  skinny_log("tcp_payload %p, tcp_payload_len  %d th %p \n",tcp_payload,
+      tcp_payload_len,th);
+  //dump_hex(tcp_payload,tcp_payload_len);
+  handler_skinny_elements(tcp_payload,tcp_payload_len);
+  
 error:
-	return;
+  return;
 }
 
 int sniffer_loop_skinny( pcap_t *p)
 {
-	 pcap_loop( p,-1,sniffer_handle_skinny,(u_char*)NULL);
-	 return 0;
+   pcap_loop( p,-1,sniffer_handle_skinny,(u_char*)NULL);
+   return 0;
 }
 
 /***********************************************
-çº¿ç¨‹å¯åŠ¨ä¸Žæ‰§è¡Œä½“
+?o??¨???ˉ??¨????‰§è????“
 ************************************************/
 /*
 sniffer_sip_loop:
-æ‰“å¼€pcap_file,è¿›å…¥æŠ“åŒ…æ‰§è¡Œä½“ã€‚
+?‰“??€pcap_file,è???…￥??“??…?‰§è????“?€?
 
 */
 void* sniffer_skinny_loop(void* arg)
 {
 
-	char filter[200] = {0};
+  char filter[200] = {0};
     pcap_t* pd=0;
 
-	//pd = open_pcap_file("enp0s3",65535,1,0);
-	pd = open_pcap_file("eth0",65535,1,0);
-	if(pd == NULL)
-	{
+  //pd = open_pcap_file("enp0s3",65535,1,0);
+  pd = open_pcap_file("eth0",65535,1,0);
+  if(pd == NULL)
+  {
 
-		skinny_log_err("open_pcap_file failed ! <%s> and exit\n",strerror(errno));
-		exit(1);
-	}
+    skinny_log_err("open_pcap_file failed ! <%s> and exit\n",strerror(errno));
+    exit(1);
+  }
 
-	sprintf(filter,"tcp and host %s and port %d ",
-		inet_ntoa(g_config.skinny_call.ip),
-		g_config.skinny_call.port);
-	sniffer_setfilter(pd,filter);
-	skinny_log("filter: %s\n",filter);
+  sprintf(filter,"tcp and host %s and port %d ",
+    inet_ntoa(g_config.skinny_call.ip),
+    g_config.skinny_call.port);
+  sniffer_setfilter(pd,filter);
+  skinny_log("filter: %s\n",filter);
     skinny_log("sniffer_skinny_loop ok  \n");
 
-	while(1)
-	{
-		sniffer_loop_skinny(pd);
-	}
+  while(1)
+  {
+    sniffer_loop_skinny(pd);
+  }
 }
 
 
 pthread_t __sniffer_skinny_start(void)
 {
-	pthread_t tid;
-	if(pthread_create(&tid,NULL,sniffer_skinny_loop,NULL))
-	{
-		skinny_log_err("create  sniffer_skinny_loop failed\n");
-		return -1;
-	}
+  pthread_t tid;
+  
+  INIT_LIST_HEAD(&skinny_ctx.si_head);
+  if(pthread_create(&tid,NULL,sniffer_skinny_loop,NULL))
+  {
+    skinny_log_err("create  sniffer_skinny_loop failed\n");
+    return -1;
+  }
 
-	return tid;
+  return tid;
 
 }
 
@@ -1554,7 +1692,7 @@ FILE* skinny_log_fp;
 
 pthread_t sniffer_skinny_start(void)
 {
-	pthread_t tid;
+  pthread_t tid;
 
     
     skinny_log_fp = fopen(SKINNY_LOG_FILE,"a+");
@@ -1564,9 +1702,9 @@ pthread_t sniffer_skinny_start(void)
         exit(1);
     }
 
-	tid = __sniffer_skinny_start();
+  tid = __sniffer_skinny_start();
     skinny_log("%s:%d tid %d\n",__func__,__LINE__,tid);
-	return tid;
+  return tid;
 
 }
 

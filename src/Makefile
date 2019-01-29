@@ -16,8 +16,11 @@ lib_obj =  $(lib_src:.c=.o)
 voice_lib_obj =  $(voice_lib_src:.c=.o)
 
 all_src = $(progam_src) $(lib_src) $(voice_lib_src)
-CFLAGS += -Wall  -Wno-unused-result -Wno-discarded-qualifiers
-CFLAGS +=  -Wno-deprecated-declarations -Wextra -Wwrite-strings -Wno-unused-parameter 
+CFLAGS += -Wall -Werror
+#CFLAGS += -Wno-unused-result -Wno-discarded-qualifiers
+CFLAGS +=  -Wno-deprecated-declarations 
+#-Wextra -Wwrite-strings -Wno-unused-parameter 
+#-Wno-unused-function -Wno-implicit-function-declaration -Wno-unused-variable
 CFLAGS += -g -O2
 #CFLAGS += -Werror=parentheses
 #-std=gnu99 -D_GNU_SOURCE -D_REEN^CANT -g -O2
@@ -25,7 +28,7 @@ CFLAGS +=-I$(STAGING_DIR)/usr/include  -I./
 CFLAGS += -I./ -I./libs/ -I./voice_lib/ -I$(TOOLCHAIN_DIR)/usr/include
 
 
-CFLAGS += -Wall -Werror -Wno-unused-function -Wno-implicit-function-declaration -Wno-unused-variable
+
 LDFLAGS = -L$(STAGING_DIR)/usr/lib/ -ljson-c -lpcap -lpthread -lcurl
 vpath %.c ./libs ./voice_lib
 vpath %.c  ./voice_lib

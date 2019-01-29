@@ -67,25 +67,15 @@ struct  person
 
 struct session_info //与信令协议 sip ,skinny无关。是更高一级的应用数据。把从信令中得到的信息保存于此。
 {
-    struct list_head node;
+    struct list_head node; //这也是sip的东东。
 
-    char* call_id; 
-   // u32   callReference; //for skinny;
-    /* 如何判断calling? 如何说INVATE的IP层srcIP == sdp.
-    connection IP.  this ip 就是calling. */
+    char* call_id;  //这是sip的内容
     struct  person calling;
     struct  person called;
     
     int mode; /* call direction   */ // 1是主叫，2是被叫。
     char    called_group_number[64];
     pthread_t rtp_sniffer_tid;
-
-    #if 0
-    int skinny_state;
-    
-    int skinny_callstate_connected;
-    
-     #endif
      
 }; /* 用于记录本次通信的两者的ip, port, 电话号码，用户名等等。*/
 
