@@ -335,6 +335,8 @@ extern struct config_st g_config;
 
 
 
+int g_skinny_serial_no = 0;
+
 struct skinny_frame_info {
   u32 callRef;//callid;
 };
@@ -399,6 +401,8 @@ static struct skinny_callReference_info* skinny_new_session(void)
     memset(skinny_callRefer_info,0,sizeof(struct skinny_callReference_info));
     INIT_LIST_HEAD(&skinny_callRefer_info->skinny_media_list);
     pthread_mutex_lock(&skinny_ctx.head_lock);
+    skinny_callRefer_info->skinny_serial_no = g_skinny_serial_no;
+    g_skinny_serial_no++;
     list_add(&skinny_callRefer_info->node,&skinny_ctx.si_head);
     pthread_mutex_unlock(&skinny_ctx.head_lock);
     return skinny_callRefer_info;
@@ -629,6 +633,7 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
     	&&(sm->session_comm_info.calling.ip.s_addr !=0)
     	&&(skinny_callRefer_info->skinny_callstate_connected == 1))
 	{
+		sm->session_comm_info.serial_no = sm->pfather->skinny_serial_no;
     	sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
 
     	
@@ -1090,10 +1095,15 @@ void __update_rtp_session_number (
 			strncpy(n->calling.number, 
 				skinny_callRefer_info->calling_number,
 				sizeof(n->calling.number));
-				
+            
+
 			strncpy(n->called_group_number, 
 				skinny_callRefer_info->called_group_number,
 				sizeof(n->called_group_number));
+
+            skinny_log("I update the called group number(%s) to rtp \n",
+            n->called_group_number);
+
 		}
 	}
 }

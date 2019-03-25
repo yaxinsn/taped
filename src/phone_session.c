@@ -28,7 +28,7 @@
 
 struct session_ctx_t sip_ctx;
 
-
+int g_serial_no =0;//sip use it
 struct session_info* si_new_session()
 {
     struct session_info* ss =NULL;
@@ -38,6 +38,8 @@ struct session_info* si_new_session()
     memset(ss,0,sizeof(struct session_info));
     pthread_mutex_lock(&sip_ctx.head_lock);
     list_add(&ss->node,&sip_ctx.si_head);
+    ss->serial_no = g_serial_no;
+    g_serial_no++;
     pthread_mutex_unlock(&sip_ctx.head_lock);
     return ss;
 }

@@ -53,7 +53,7 @@ struct rtp_ctx_t
     pthread_mutex_t head_lock;  //sync
     
     struct list_head rtp_head;
-    u32     serial_no;
+   // u32     serial_no;
 
 };
 struct rtp_ctx_t rtp_ctx;
@@ -820,6 +820,11 @@ int upload_the_mix_file(struct rtp_session_info* n)
     n->mix_file_frag_count++;
     /*  this function should be locked by curl_upload module
     */
+    log("before upload_push_msg in rtp:\n");
+    log("called_group_number %s \n",ufi.called_group_number);
+    log("call_caller_number %s \n",ufi.call_caller_number);
+    log("call_callee_number %s \n",ufi.call_callee_number);
+    
     ret = uploader_push_msg((struct upload_msg*)&ufi,sizeof(ufi));
     return ret;
 }
@@ -1090,7 +1095,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
 	sprintf(callingip_str,"%s",inet_ntoa(ss->calling.ip));
 	sprintf(calledip_str,"%s",inet_ntoa(ss->called.ip));
 	
-	sprintf(filter,"\(udp and host %s and port %d \) or \(udp and host %s and port %d \) ",
+	sprintf(filter,"(udp and host %s and port %d ) or (udp and host %s and port %d ) ",
 	    callingip_str,
 	    ss->calling.port,
 	       calledip_str,
@@ -1127,6 +1132,7 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
 	    inet_ntoa(ss->calling.ip),ss->calling.port,ss->calling.number);
 	log("sniffer called  %s:%d phone_number %s \n",
 	    inet_ntoa(ss->called.ip),ss->called.port,ss->called.number);
+	log("Serial_No %d \n", ss->serial_no);
 
     pd =  init_sniffer_rtp(ss);
     if(pd == NULL)
@@ -1174,8 +1180,8 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
     
  //   log("DEBUG here\n");
 
-    rs->session_id = rtp_ctx.serial_no;
-    rtp_ctx.serial_no++;
+    rs->session_id = ss->serial_no; //rtp_ctx.serial_no;
+   // rtp_ctx.serial_no++;
 	//session_up();
 	
 	if(pthread_create(&tid,NULL,sniffer_rtp_loop1,rs))
@@ -1196,7 +1202,7 @@ void rtp_sniffer_init(void)
 {
 
     INIT_LIST_HEAD(&rtp_ctx.rtp_head);
-    rtp_ctx.serial_no = 0;
+    //rtp_ctx.serial_no = 0;
     ulawcodec_init();
     ast_alaw_init();
 
