@@ -88,7 +88,7 @@ pcap_t* open_pcap_file(const char* device,int snaplen,int promise,int to_ms)
     printf("the real cap :%d \n",real_cap_len);
 	    //设置过滤规则
 	
-#if 1
+#if 0
     pcap_compile(pd, &fcode, "arp",1, 0);
     printf("pcap_compile error %d %s\n",errno,strerror(errno));
 //printf("--------------\n");
@@ -116,7 +116,8 @@ int sniffer_setfilter(pcap_t * pd,const char* bpf_str)
     //设置过滤器
     if(pcap_setfilter(pd, &fcode) < 0)
         printf("pcap_setfilter error %d %s\n",errno,strerror(errno));
-    //数据包捕获
+    
+    __set_nonblock(pd);
     return 0;
 }
 #if 0
