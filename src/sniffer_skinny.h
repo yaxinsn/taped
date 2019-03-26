@@ -55,7 +55,6 @@ struct skinny_frame
 
   enum skinny_session_state state;
 };
-
 typedef struct skinny_callReference_info
 {
 
@@ -79,6 +78,7 @@ typedef struct skinny_callReference_info
     
     int 			skinny_state;//1 = ;2=onHOOK(挂机)
     int 			skinny_callstate_connected;
+    int 			skinny_serial_no;
     struct list_head skinny_media_list;
 
 }skinny_callRefer;

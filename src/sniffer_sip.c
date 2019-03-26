@@ -773,7 +773,7 @@ void _close_session(struct sip_pkt* spkt_p)
             sip_log("I find the session (callid %s),and close it. \n",ss->call_id);
  //           ss->state = spkt_p->state;
             
-            close_rtp_sniffer(ss->rtp_sniffer_tid);
+            close_dial_session_sniffer(ss->rtp_sniffer_tid);
         }
         else
         {

@@ -113,8 +113,15 @@ struct rtp_session_info
 };
 
 pthread_t setup_rtp_sniffer(struct session_info* ss);
-
-void close_rtp_sniffer(unsigned long rtp_sniffer_tid);
+/*
+结束整个通话的会话。就是用户挂机时的处理。
+不是RTP通信的结束。
+*/
+void close_dial_session_sniffer(unsigned long rtp_sniffer_tid);
+/*
+结一个rtp通信。
+*/
+void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid);
 
 void rtp_sniffer_init(void);
 //void update_rtp_session_number(struct session_info* ss);

@@ -517,9 +517,9 @@ int linear_list_mix(struct rtp_session_info* rs)
     
     }
     
-        log("save file name %s \n",save_file_name);    
-        sprintf(rs->mix_file_name,"%s",save_file_name);
-        dest_fp = fopen(save_file_name,"w");
+    log("save file name %s \n",save_file_name);    
+    sprintf(rs->mix_file_name,"%s",save_file_name);
+    dest_fp = fopen(save_file_name,"w");
 
     do
     {
@@ -804,7 +804,15 @@ int upload_the_mix_file(struct rtp_session_info* n)
     else if ( n->mix_file_frag_info_caller == 0 
         && n->mix_file_frag_count != 0)
     {
-         sprintf(ufi.frag_flag,"%d",2); //last frag
+    	if(n->exit_flag == 2)
+    	{
+        	sprintf(ufi.frag_flag,"%d",2); //last frag
+        }
+        else
+        {
+        	sprintf(ufi.frag_flag,"%d",1); //last frag
+        	
+        }
     }
     sprintf(ufi.frag_serial_no ,"%d",n->session_id);
   //  sprintf(ufi.file_name,"from_%s_to_%s_startTime_%s.mix",
@@ -828,6 +836,8 @@ int upload_the_mix_file(struct rtp_session_info* n)
     ret = uploader_push_msg((struct upload_msg*)&ufi,sizeof(ufi));
     return ret;
 }
+
+
 void handler_last_linear_list(struct rtp_session_info* n)
 {
 
@@ -838,7 +848,17 @@ void handler_last_linear_list(struct rtp_session_info* n)
         n->called_mix_list_st.linear_buf_list;
        
      linear_list_mix(n);
-     n->mix_file_frag_info_caller = 0;//last frag
+
+     if(n->exit_flag ==2)
+     {
+     
+     	n->mix_file_frag_info_caller = 0;//last frag
+     }
+     else
+     {
+     	
+     	n->mix_file_frag_info_caller = 1;//not last frag
+     }
      upload_the_mix_file(n);
 }
 static int finish_rtp(struct rtp_session_info* n)
@@ -851,10 +871,12 @@ static int finish_rtp(struct rtp_session_info* n)
             
     pcap_close(n->pd);
     handler_last_linear_list(n);
-         
-    _rtp_del_session(n);
-    log("I(%u) and finish  \n",pthread_self());
-    pthread_exit(&retval);
+ 	if(n->exit_flag == 2)
+ 	{
+	    _rtp_del_session(n);
+	    log("I(%u) and finish  \n",pthread_self());
+	    pthread_exit(&retval);
+    }
     return 0;
 }
 
@@ -977,35 +999,61 @@ int thread_kill(pthread_t thread_id)
     return 0;
 }
 
-void close_rtp_sniffer(unsigned long rtp_sniffer_tid)
+void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 {
 
-    //session_down();
-    
-    //time(&ss->stop_time_stamp);
-   // struct rtp_session_info* n;
-    if(rtp_sniffer_tid)
-    {
-    
-        log(" I (%u) kill %u thread(rtp) \n",(unsigned long)pthread_self()
-                ,(unsigned long)rtp_sniffer_tid);
-#if 0
-        n = _rtp_find_session(ss->rtp_sniffer_tid);
-        if(n)
-        {
+	//session_down();
+	
+	//time(&ss->stop_time_stamp);
+    struct rtp_session_info* n;
+	if(rtp_sniffer_tid)
+	{
+	
+		log(" I (%u) kill %u thread(rtp) \n",(unsigned long)pthread_self()
+				,(unsigned long)rtp_sniffer_tid);
+#if 1
+		n = _rtp_find_session(rtp_sniffer_tid);
+		if(n)
+		{
 
-            log("sync time;\n");
-            if(ss->ring_time.tm_year != 0)
-            {
-                memcpy(&n->ring_time,&ss->ring_time,sizeof(ss->ring_time));
-            }
+			log("set rtp sniffer's exit_flag to 1( only close one rtp ) \n");
+			n->exit_flag = 1;
 
-        }
+		}
 #endif
-          
-        thread_kill(rtp_sniffer_tid);
-    }
+		  
+		//thread_kill(rtp_sniffer_tid);
+	}
 }
+
+
+void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
+{
+
+	//session_down();
+	
+	//time(&ss->stop_time_stamp);
+	struct rtp_session_info* n;
+	if(rtp_sniffer_tid)
+	{
+	
+		log(" I (%u) kill %u thread(rtp) \n",(unsigned long)pthread_self()
+				,(unsigned long)rtp_sniffer_tid);
+#if 1
+		n = _rtp_find_session(rtp_sniffer_tid);
+		if(n)
+		{
+
+			log("set rtp sniffer's exit_flag to 2(all dial session close) \n");
+			n->exit_flag = 2;
+
+		}
+#endif
+		  
+		//thread_kill(rtp_sniffer_tid);
+	}
+}
+
 
 void handle_rtp(struct iphdr* iph,struct udphdr* udph,void* arg)
 {

@@ -481,7 +481,7 @@ skinny_media_info* __skinny_find_media(skinny_callRefer* skinny_call, u32 passTh
         }
     }
     
-    skinny_log("ERROR: nofind callid %u at skinnyCallRefencee %u \n",passThruPartyID,skinny_call->call_id);
+    skinny_log("ERROR: nofind passThruPartyID %u at skinnyCallRefencee %u \n",passThruPartyID,skinny_call->call_id);
     return NULL;
 }
 
@@ -540,7 +540,7 @@ void close_skinny_media(skinny_media_info* sm,
     skinny_log(" close this callid %u sm %p media %u \n",skinny_callRefer_info->call_id,
     sm,sm->passThruPartyID);
 
-    close_rtp_sniffer(sm->session_comm_info.rtp_sniffer_tid);
+    close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_tid);
         __skinny_del_media(skinny_callRefer_info,sm);
 }
 void close_skinny_session_by_Callid(u32 callid)
@@ -564,6 +564,7 @@ void close_skinny_session_by_Callid(u32 callid)
     }
 
 }
+#if 0
 void close_skinny_media_by_PartyID(struct skinny_callReference_info* skinny_callRefer_info,u32 passThruPartyID)
 {
 
@@ -573,7 +574,7 @@ void close_skinny_media_by_PartyID(struct skinny_callReference_info* skinny_call
     sm = __skinny_find_media(skinny_callRefer_info,passThruPartyID);
     if(sm)
     {
-        close_rtp_sniffer(sm->passThruPartyID);
+        close_dial_session_sniffer(sm->passThruPartyID);
         __skinny_del_media(skinny_callRefer_info,sm);
         
     }
@@ -584,7 +585,7 @@ void close_skinny_media_by_PartyID(struct skinny_callReference_info* skinny_call
     }
 
 }
-
+#endif
 /* all session 's end is clearPromptStatus 2018-5-6 */
 void handle_clear_prompt_status(skinny_opcode_map_t* skinny_op, 
                     u8* msg,u32 len,
@@ -799,6 +800,26 @@ void handle_startMediaTransmissionACK(
  END:
  	return;
  }
+ int stop_oneMedia(u32 conferenceID, u32 passThruPartyID)
+ {
+ 
+    struct skinny_callReference_info* skinny_callRefer_info;
+    skinny_media_info* sm;
+ 	skinny_callRefer_info = skinny_get_session_by_callRef(conferenceID);
+    if(skinny_callRefer_info)
+    {   	
+    	sm =  __skinny_find_media(skinny_callRefer_info,passThruPartyID);
+    	if(!sm)
+    	{
+    		skinny_log_err("find the media failed!@@@\n");
+    		goto END;
+    	}
+    	
+    	close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_tid);
+    }
+ END:
+ 	return -1;
+ }
  void handle_StopMediaTransmission(
   skinny_opcode_map_t* skinny_op, 
   u8* msg,
@@ -823,8 +844,10 @@ void handle_startMediaTransmissionACK(
   //  sprintf(callid,"%u",callReference);
 
 
-    skinny_log("close the callid(%u) \n",callReference);
-    close_skinny_session_by_Callid(callReference);
+    skinny_log("close the callid(%u)'s one passThruPartyID(%u) \n",callReference,passThruPartyID);
+   // close_skinny_session_by_Callid(callReference);
+   //只关闭一个rtp. 2019-3-26.
+   stop_oneMedia(conferenceID,passThruPartyID);
  }
 
 void handle_open_receive_channel_ack(
@@ -837,7 +860,7 @@ void handle_open_receive_channel_ack(
   handle_default_function(skinny_op,msg,len,skinny_info);
 }
 
-#if 1
+#if 0
 #if 0
 /* 当时由于taped没有ntp服务，只好从报文里取出时钟时间，再计算出通话的开始时间。 */
 void cul_skinny_start_time(struct skinny_callReference_info* ss, struct tm* t)
@@ -854,6 +877,8 @@ void cul_skinny_start_time(struct skinny_callReference_info* ss, struct tm* t)
     skinny_log(" I get time: acstime %s  \n",asctime(tt));
 }
 #endif
+#if 0
+
 void check_all_session_is_callstate_onhook(struct tm* t)
 {
     struct skinny_callReference_info* p;
@@ -947,6 +972,7 @@ void handle_default_TimeDate(
         
   }
 }
+#endif
 #endif
 #if 0
 handle_prompt_status_v2(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
