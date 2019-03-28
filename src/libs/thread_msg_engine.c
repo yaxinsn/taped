@@ -17,23 +17,33 @@ static int msg_engine_init(struct msg_engine_ctx* me)
 
 static int msg_engine_handler(struct msg_engine_ctx* _ctx )
 {
-	
+
 	_entry_st* entry = NULL;
 	_entry_st* entry_next = NULL;
 	int ret;
+
+	entry_head_t tmp_msg_head;
+
+	TAILQ_INIT(&tmp_msg_head);
 	pthread_mutex_lock(&_ctx->mutex);
 	TAILQ_FOREACH_SAFE(entry,&_ctx->msg_head,node,entry_next)
+	{
+    	TAILQ_REMOVE(&_ctx->msg_head,entry,node);
+    	TAILQ_INSERT_TAIL(&tmp_msg_head, entry, node);
+	}
+	pthread_mutex_unlock(&_ctx->mutex);
+
+	TAILQ_FOREACH_SAFE(entry,&tmp_msg_head,node,entry_next)
 	{
 
 		ret = _ctx->cb_func(entry->msg,entry->len,_ctx);
 	    if(ret == 0)
 	    {
-	    	TAILQ_REMOVE(&_ctx->msg_head,entry,node);
+	    	TAILQ_REMOVE(&tmp_msg_head,entry,node);
 		    free(entry);
 		}
 	}
-	
-	pthread_mutex_unlock(&_ctx->mutex);
+
 	return 0;
 }
 
@@ -73,7 +83,7 @@ int msg_engine_push_entry(struct msg_engine_ctx* me,void* msg,int len)
     }
 
     memset(entry,0,sizeof(_entry_st)+len);
-    
+
     entry->len = len;
     //_u_log("push msg type is %d len %d",type,len);
     memcpy(entry->msg,msg,len);
