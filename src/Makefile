@@ -1,7 +1,7 @@
 
 
 
-CC=arm-linux-gnueabihf-gcc
+CC=/opt/gcc-linaro-arm-linux-gnueabihf-4.7-2013.03-20130313_linux/bin/arm-linux-gnueabihf-gcc
 
 TARGET_DIR=../rundir
 STAGING_DIR=../staging_dir/staging_dir
