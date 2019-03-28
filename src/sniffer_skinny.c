@@ -634,11 +634,29 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
     	&&(sm->session_comm_info.calling.ip.s_addr !=0)
     	&&(skinny_callRefer_info->skinny_callstate_connected == 1))
 	{
-		sm->session_comm_info.serial_no = sm->pfather->skinny_serial_no;
-    	sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
 
-    	
-	skinny_log("_-_-_----- sm->session_comm_info.rtp_sniffer_tid %u\n",sm->session_comm_info.rtp_sniffer_tid);
+    skinny_log("skinny(%u)_serial_no %d---\n",sm->pfather->call_id,sm->pfather->skinny_serial_no);
+    skinny_log("skinny(%u) passThruPartyID %u\n",sm->pfather->call_id,sm->passThruPartyID);
+    skinny_log("sniffer calling %s:%d phone_number %s \n",
+        inet_ntoa(sm->session_comm_info.calling.ip),sm->session_comm_info.calling.port,sm->session_comm_info.calling.number);
+    skinny_log("sniffer called  %s:%d phone_number %s \n",
+	    inet_ntoa(sm->session_comm_info.called.ip),sm->session_comm_info.called.port,sm->session_comm_info.called.number);
+
+    sm->session_comm_info.serial_no = sm->pfather->skinny_serial_no;
+    if(0 == sm->session_comm_info.rtp_sniffer_tid)
+    {
+
+        sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
+        skinny_log("_-_-_----- passThruPartyID (%u)'s rtp_sniffer_tid %u\n",
+        sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_tid);
+    }
+    else
+    {
+        skinny_log("_-_-_----- passThruPartyID (%u) has rtp_sniffer_tid %u, not need create again\n",
+            sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_tid);
+    }
+
+
     }
 }
 void __start_rtp_sniffer(struct skinny_callReference_info* skinny_callRefer_info)
@@ -1390,7 +1408,7 @@ void handle_LineStateV2 (
 void handle_default_function (skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     skinny_info_t* skinny_info)
 {
-  skinny_log("%s and msg len %d  \n",skinny_op->name,len);
+  //skinny_log("%s and msg len %d  \n",skinny_op->name,len);
   
 }
 
@@ -1594,7 +1612,7 @@ void handler_skinny_elements(u8* msg,int msg_size)
 
     CW_LOAD_U32(hdr_opcode,p);
     message_len = len -4;
-    skinny_log("len %x (%x) ver %x opcode %x\n",len,htonl(len),hdr_ver,hdr_opcode);
+  //  skinny_log("len %x (%x) ver %x opcode %x\n",len,htonl(len),hdr_ver,hdr_opcode);
     if(p+message_len <= msg+msg_size)
     {
       for (i = 0; i < sizeof(skinny_opcode_map)/sizeof(skinny_opcode_map_t) ; i++) 
@@ -1658,7 +1676,7 @@ static void sniffer_handle_skinny(u_char * user, const struct pcap_pkthdr * pack
   int tcp_len;
   
   
-  skinny_log("\n\n");
+  //skinny_log("\n\n");
   ret = check_iphdr(phdr,packet_content,&iph);
   if(ret != 0){
     
@@ -1676,15 +1694,15 @@ static void sniffer_handle_skinny(u_char * user, const struct pcap_pkthdr * pack
   tcp_payload = ((u8*)th)+(th->doff * 4);
   tcp_len = ntohs(iph->tot_len)- iph->ihl*4;
   tcp_payload_len = tcp_len - (th->doff * 4);
-  show_tcp_info(th);
+ // show_tcp_info(th);
   if(tcp_payload_len == 0)
   {
     skinny_log("this frame no tcp payload\n\n");
     return;
   }
   
-  skinny_log("tcp_payload %p, tcp_payload_len  %d th %p \n",tcp_payload,
-      tcp_payload_len,th);
+//  skinny_log("tcp_payload %p, tcp_payload_len  %d th %p \n",tcp_payload,
+//      tcp_payload_len,th);
   //dump_hex(tcp_payload,tcp_payload_len);
   handler_skinny_elements(tcp_payload,tcp_payload_len);
   
