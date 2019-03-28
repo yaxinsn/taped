@@ -26,10 +26,12 @@
 /*skinny portorol  used Little-Endian */
 extern FILE* skinny_log_fp;
 #define SKINNY_LOG_FILE "/home/root/hzivy-skinny.log"
-
+#if 0
 #define skinny_log(fmt,...)  \
     _logger_file2(skinny_log_fp,SKINNY_LOG_FILE ,__func__,__LINE__,fmt,##__VA_ARGS__);  
-
+#endif
+#define skinny_log(fmt,...)  \
+    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,fmt,##__VA_ARGS__);
 
 #define skinny_log_err(fmt,...)  \
             skinny_log("ERROR|"fmt,##__VA_ARGS__); 
