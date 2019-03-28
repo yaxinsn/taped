@@ -503,16 +503,16 @@ int linear_list_mix(struct rtp_session_info* rs)
         if(rs->call_dir == SS_MODE_CALLING)
     {
     
-    sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d.mix",
+    sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
             rs->calling.number,rs->called.number,ring_time,
-            rs->session_id,rs->mix_file_frag_count);
+            rs->session_id,rs->mix_file_frag_count,rs->thread_id);
             
     }
     else
     {
-    sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d.mix",
+    sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
             rs->calling.number,rs->called.number,ring_time,
-            rs->session_id,rs->mix_file_frag_count);
+            rs->session_id,rs->mix_file_frag_count,rs->thread_id);
             
     
     }
@@ -869,13 +869,21 @@ static int finish_rtp(struct rtp_session_info* n)
     time(&n->stop_time_stamp);
     cul_rtp_end_time(n);
             
-    pcap_close(n->pd);
     handler_last_linear_list(n);
  	if(n->exit_flag == 2)
  	{
+        pcap_close(n->pd);
 	    _rtp_del_session(n);
 	    log("I(%u) and finish  \n",pthread_self());
 	    pthread_exit(&retval);
+    }
+    else
+    {
+            while(1)
+	        {
+	            sleep(10); //
+	            log("I(%u) sleep and wait to kill me  \n",pthread_self());
+	        }
     }
     return 0;
 }
@@ -897,8 +905,14 @@ static void sighandler(int s)
         log_err("not find rtp session \n");
     }
     log(" %u thread quit-------- \n", (unsigned long)pthread_self());
+    if(n->exit_flag == 2)
+    {
     pthread_exit(&retval);
-        
+    }
+    else
+    {
+    	log("I(%u) not exit! \n",pthread_self());
+    }
 }
 
 #if 0
@@ -976,7 +990,7 @@ int thread_kill(pthread_t thread_id)
     if(n)
     {
         log("I(%u) set (%u)'s exit_flag \n",pthread_self(),thread_id);
-        n->exit_flag = 1;
+        //n->exit_flag = 1;
      //return 0; //debug . will delet return.
     }
                 
@@ -1022,7 +1036,7 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 		}
 #endif
 		  
-		//thread_kill(rtp_sniffer_tid);
+		thread_kill(rtp_sniffer_tid);
 	}
 }
 
@@ -1050,7 +1064,7 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 		}
 #endif
 		  
-		//thread_kill(rtp_sniffer_tid);
+		thread_kill(rtp_sniffer_tid);
 	}
 }
 
