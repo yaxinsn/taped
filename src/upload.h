@@ -46,6 +46,7 @@ struct upload_msg
 {
     
     struct upload_file_info upload_file_info;
+    int reload_count;
     
 };
 

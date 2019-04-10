@@ -449,7 +449,8 @@ static skinny_media_info* __skinny_new_media(struct skinny_callReference_info* s
         return NULL;
     memset(sm,0,sizeof(skinny_media_info));
    // pthread_mutex_lock(&sip_ctx.head_lock);
-    list_add(&sm->node,&skinny_callRefer->skinny_media_list);
+    list_add_tail(&sm->node,&skinny_callRefer->skinny_media_list);
+    skinny_callRefer->skinny_media_list_num++;
     //pthread_mutex_unlock(&sip_ctx.head_lock);
     return sm;
 }
@@ -458,7 +459,10 @@ void __skinny_del_media(skinny_callRefer* skinny_call, skinny_media_info* sm)
    
 
     list_del(&sm->node);
-    
+    if(skinny_call->skinny_media_list_num >0)
+    {
+        skinny_call->skinny_media_list_num--;
+    }
     FREE(sm);
     return;
 }
@@ -539,8 +543,14 @@ void close_skinny_media(skinny_media_info* sm,
 	
     skinny_log(" close this callid %u sm %p media %u \n",skinny_callRefer_info->call_id,
     sm,sm->passThruPartyID);
-
+    if(skinny_callRefer_info->skinny_media_list_num == 1)
+    {
+        close_dial_session_sniffer_lastone(sm->session_comm_info.rtp_sniffer_tid);
+    }
+    else
+    {
     close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_tid);
+    }
         __skinny_del_media(skinny_callRefer_info,sm);
 }
 void close_skinny_session_by_Callid(u32 callid)

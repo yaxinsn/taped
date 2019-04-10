@@ -25,6 +25,9 @@
 
 #include "g722.h"
 #include "mixer.h"
+#define RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG 3
+#define RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD 2
+#define RTP_EXIT_STOP_SNIFFER_NOT_EXIT_PTHREAD 1 //stop
 struct linear_mix_list_st
 {
     
@@ -106,10 +109,11 @@ struct rtp_session_info
      struct linear_mix_list_st called_mix_list_st;
 
      int mix_file_frag_count;
-     int mix_file_frag_info_caller;  //   0 is user hung up. the rtp is stop;   1 is session_talking_2
+    // int mix_file_frag_info_caller;  //   0 is user hung up. the rtp is stop;   1 is session_talking_2
      int session_id;
      int exit_flag;
 	 char called_group_number[64];
+	 int no_send_mix_file; // 1 is no_send_mix_file;
 };
 
 pthread_t setup_rtp_sniffer(struct session_info* ss);
@@ -118,6 +122,7 @@ pthread_t setup_rtp_sniffer(struct session_info* ss);
 不是RTP通信的结束。
 */
 void close_dial_session_sniffer(unsigned long rtp_sniffer_tid);
+void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid);
 /*
 结一个rtp通信。
 */

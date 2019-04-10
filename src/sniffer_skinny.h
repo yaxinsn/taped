@@ -82,6 +82,7 @@ typedef struct skinny_callReference_info
     int 			skinny_callstate_connected;
     int 			skinny_serial_no;
     struct list_head skinny_media_list;
+    int         skinny_media_list_num;
 
 }skinny_callRefer;
 

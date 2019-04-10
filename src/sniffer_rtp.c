@@ -493,7 +493,7 @@ int linear_list_mix(struct rtp_session_info* rs)
     struct mixer* mix_engine = &rs->stMix;
     linear_buf*   lb_a;
     linear_buf*   lb_b;
-    size_t mix_len;
+    size_t mix_len = 0;
     char save_file_name[256] = {0};
     char ring_time[256] = {0};
     FILE* dest_fp;
@@ -627,7 +627,7 @@ static void session_talking_2(struct iphdr* iph,struct udphdr* udph,
 
         linear_list_mix(rs);
         
-        rs->mix_file_frag_info_caller = 1;
+ //       rs->mix_file_frag_info_caller = 1;
         upload_the_mix_file(rs);
         
         rs->called_mix_list_st.mix_ready_flag = 0;
@@ -793,16 +793,24 @@ int upload_the_mix_file(struct rtp_session_info* n)
 #else
     strncpy(ufi.file_name,n->mix_file_name,sizeof(ufi.file_name));
 #endif
-    if( n->mix_file_frag_info_caller == 0 
+    if(n->exit_flag == RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG)
+    {
+        sprintf(ufi.frag_flag,"%d",2); //last frag
+    }
+    else
+    {
+        sprintf(ufi.frag_flag,"%d",1);//first or
+    }
+#if 0
+    if( n->mix_file_frag_info_caller == 0
         && n->mix_file_frag_count == 0)
     {
-        sprintf(ufi.frag_flag,"%d",0);
+        sprintf(ufi.frag_flag,"%d",1);
     }
     else if ( n->mix_file_frag_info_caller == 1)
         sprintf(ufi.frag_flag,"%d",1);
 
-    else if ( n->mix_file_frag_info_caller == 0 
-        && n->mix_file_frag_count != 0)
+    else if ( n->mix_file_frag_info_caller == 0)
     {
     	if(n->exit_flag == 2)
     	{
@@ -811,9 +819,10 @@ int upload_the_mix_file(struct rtp_session_info* n)
         else
         {
         	sprintf(ufi.frag_flag,"%d",1); //last frag
-        	
+
         }
     }
+#endif
     sprintf(ufi.frag_serial_no ,"%d",n->session_id);
   //  sprintf(ufi.file_name,"from_%s_to_%s_startTime_%s.mix",
   //          n->calling.number,n->called.number,ring_time);
@@ -848,19 +857,21 @@ void handler_last_linear_list(struct rtp_session_info* n)
         n->called_mix_list_st.linear_buf_list;
        
      linear_list_mix(n);
-
+#if 0
      if(n->exit_flag ==2)
      {
-     
+
      	n->mix_file_frag_info_caller = 0;//last frag
      }
      else
      {
-     	
+
      	n->mix_file_frag_info_caller = 1;//not last frag
      }
+#endif
      upload_the_mix_file(n);
 }
+static int finish_rtp_in_signal(struct rtp_session_info* n);
 static int finish_rtp(struct rtp_session_info* n)
 {
     int retval=3;
@@ -870,7 +881,7 @@ static int finish_rtp(struct rtp_session_info* n)
     cul_rtp_end_time(n);
             
     handler_last_linear_list(n);
- 	if(n->exit_flag == 2)
+ 	if(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)
  	{
         pcap_close(n->pd);
 	    _rtp_del_session(n);
@@ -882,9 +893,35 @@ static int finish_rtp(struct rtp_session_info* n)
             while(1)
 	        {
 	            sleep(10); //
-	            log("I(%u) sleep and wait to kill me  \n",pthread_self());
-	        }
+            log("I(%u) sleep and wait to kill me  \n",pthread_self());
+            if(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)
+            {
+
+                log("I(%u) get exit_Flag is 2,so \n",pthread_self());
+                finish_rtp_in_signal(n);
+                break;
+            }
+        }
     }
+    return 0;
+}
+static int finish_rtp_in_signal(struct rtp_session_info* n)
+{
+    int retval=3;
+
+    log("I(%u)  enter finish_rtp \n",pthread_self());
+    time(&n->stop_time_stamp);
+    cul_rtp_end_time(n);
+
+    handler_last_linear_list(n);
+ 	if(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)
+ 	{
+        pcap_close(n->pd);
+	    _rtp_del_session(n);
+	    log("I(%u) and finish and quit  \n",pthread_self());
+	    pthread_exit(&retval);
+    }
+
     return 0;
 }
 
@@ -898,20 +935,21 @@ static void sighandler(int s)
     if(n)
     {
         log("I(%u) find the session info and finish it \n",pthread_self());
-        finish_rtp(n);
+        finish_rtp_in_signal(n);
     }
     else
     {
         log_err("not find rtp session \n");
     }
     log(" %u thread quit-------- \n", (unsigned long)pthread_self());
-    if(n->exit_flag == 2)
+    if(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)
     {
     pthread_exit(&retval);
     }
     else
     {
     	log("I(%u) not exit! \n",pthread_self());
+        n->no_send_mix_file = 1;
     }
 }
 
@@ -1031,7 +1069,7 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 		{
 
 			log("set rtp sniffer's exit_flag to 1( only close one rtp ) \n");
-			n->exit_flag = 1;
+			n->exit_flag = RTP_EXIT_STOP_SNIFFER_NOT_EXIT_PTHREAD;
 
 		}
 #endif
@@ -1040,7 +1078,32 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 	}
 }
 
+void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
+{
 
+	//session_down();
+
+	//time(&ss->stop_time_stamp);
+	struct rtp_session_info* n;
+	if(rtp_sniffer_tid)
+	{
+
+		log(" I (%u) kill %u thread(rtp) \n",(unsigned long)pthread_self()
+				,(unsigned long)rtp_sniffer_tid);
+#if 1
+		n = _rtp_find_session(rtp_sniffer_tid);
+		if(n)
+		{
+
+			log("set rtp sniffer's exit_flag to 2(all dial session close) \n");
+			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG;
+
+		}
+#endif
+
+		thread_kill(rtp_sniffer_tid);
+	}
+}
 void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 {
 
@@ -1059,7 +1122,7 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 		{
 
 			log("set rtp sniffer's exit_flag to 2(all dial session close) \n");
-			n->exit_flag = 2;
+			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD;
 
 		}
 #endif
