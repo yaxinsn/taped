@@ -498,21 +498,37 @@ int linear_list_mix(struct rtp_session_info* rs)
     char ring_time[256] = {0};
     FILE* dest_fp;
     int tttt = 0;
-    strftime(ring_time,256,"%Y-%m-%d-%H-%M-%S",&rs->ring_time);
 
-        if(rs->call_dir == SS_MODE_CALLING)
+    char           *calling_number =  rs->calling.number;
+
+    char           *called_number = rs->called.number;
+
+
+    strftime(ring_time,256,"%Y-%m-%d-%H-%M-%S",&rs->ring_time);
+    if(calling_number[0] == '*')
     {
-    
-    sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
-            rs->calling.number,rs->called.number,ring_time,
-            rs->session_id,rs->mix_file_frag_count,rs->thread_id);
-            
+        calling_number++;
+    }
+    if(called_number[0] == '*')
+    {
+         called_number++;
+    }
+
+    if(rs->call_dir == SS_MODE_CALLING)
+    {
+
+
+
+        sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
+                calling_number,called_number,ring_time,
+                rs->session_id,rs->mix_file_frag_count,rs->thread_id);
+
     }
     else
     {
-    sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
-            rs->calling.number,rs->called.number,ring_time,
-            rs->session_id,rs->mix_file_frag_count,rs->thread_id);
+        sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
+                 calling_number,called_number,ring_time,
+                rs->session_id,rs->mix_file_frag_count,rs->thread_id);
             
     
     }
