@@ -121,7 +121,7 @@ void _logger_file2(FILE* log_fp,const char* file_name, const char* func, int lin
     fflush(log_fp);
     if(!stat(file_name,&st_a))
     {
-    	if(st_a.st_size >= 4096*100)
+    	if(st_a.st_size >= 16*1024*1000)
     	{
 	        fd = fileno(log_fp);
 	        ftruncate(fd, 0);
