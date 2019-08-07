@@ -1216,7 +1216,7 @@ void handle_callinfo2_function(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
   CW_LOAD_U32(lineInstance,p);
   CW_LOAD_U32(callReference,p);
   CW_LOAD_U32(callType,p);
-  
+    skinny_log("callReference:<%u>\n",callReference);
   CW_LOAD_U32(originalCdpnRedirectReason,p);
   CW_LOAD_U32(lastRedirect,p);
   CW_LOAD_U32(callInstance,p);
@@ -1265,14 +1265,33 @@ void handle_callinfo2_function(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
         strncpy(skinny_callRefer_info->called_group_number,
           skinny_callRefer_info->called_number,sizeof(skinny_callRefer_info->called_group_number));
         /* update the new called number ....2018-12-3 */
-        strncpy(skinny_callRefer_info->called_number,calledParty,sizeof(skinny_callRefer_info->called_number));
-        
+        strncpy(skinny_callRefer_info->called_number,calledParty,
+            sizeof(skinny_callRefer_info->called_number));
+
       }
     }
   }
-  strncpy(skinny_callRefer_info->calling_number,callingParty,sizeof(skinny_callRefer_info->calling_number));
-  skinny_log("I get called number %s,calling number %s \n",
-      skinny_callRefer_info->called_number,skinny_callRefer_info->calling_number);
+    if(skinny_callRefer_info->calling_number[0] == 0)
+    {
+      strncpy(skinny_callRefer_info->calling_number,callingParty,
+            sizeof(skinny_callRefer_info->calling_number));
+    }
+    else
+    {
+
+        if(!strcmp(skinny_callRefer_info->called_number,callingParty))
+        {
+            skinny_log("skinny_callRefer_info->called_number is same callingParty!\n");
+        }
+        else
+        {
+            strncpy(skinny_callRefer_info->calling_number,callingParty,
+                sizeof(skinny_callRefer_info->calling_number));
+        }
+    }
+
+      skinny_log("I get called number %s,calling number %s \n",
+          skinny_callRefer_info->called_number,skinny_callRefer_info->calling_number);
   
   LOAD_STR_LINE(p, cgpnVoiceMailbox, 127, 0);
   skinny_log("cgpnVoiceMailbox:<%s>\n",cgpnVoiceMailbox);
