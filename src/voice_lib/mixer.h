@@ -9,4 +9,5 @@ struct mixer{
 };
 bool mix(struct mixer* mix,char* data, size_t len, size_t* mixed_len);
 
+void build_wav_header(long pcm_size, unsigned char* header);
 #endif
