@@ -447,7 +447,7 @@ static linear_buf* session_talking_pkt_to_linear
    // int dest_g722_len;
    // u8* dest_buf;
  //   int mix_len;
-    //bool ret;
+    int ret;
     linear_buf*   lb; 
     lb = malloc(sizeof(linear_buf));
     if(lb == NULL)
@@ -457,19 +457,21 @@ static linear_buf* session_talking_pkt_to_linear
     }
     memset(lb,0,sizeof(linear_buf));
     if(rs->rtp_type == RTP_TYPE_PCMU_G722)
-            session_talking_pkt_dec722_2(rs,payload,
-                payload_len,g722_decode, lb);
+    {
+        ret = session_talking_pkt_dec722_2(rs,payload,
+            payload_len,g722_decode, lb);
+    }
     else if(rs->rtp_type == RTP_TYPE_PCMU)
     {
-        session_talking_pkt_dec711u_2(rs,payload,
+        ret= session_talking_pkt_dec711u_2(rs,payload,
         payload_len,lb);
-        
+
     }
     else if (rs->rtp_type == RTP_TYPE_PCMU_PCMA)
     {
-        session_talking_pkt_dec711a_2(rs,payload,
+        ret = session_talking_pkt_dec711a_2(rs,payload,
         payload_len,lb);
-        
+
     }
     else
     {
@@ -477,9 +479,12 @@ static linear_buf* session_talking_pkt_to_linear
         return NULL;
     }
 
-   
-     
-     return lb;
+    if(ret == -1)
+    {
+        FREE(lb);
+        return NULL;
+    }
+    return lb;
 }
 
 //6000  pkt == 120s 
