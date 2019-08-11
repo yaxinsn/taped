@@ -261,6 +261,7 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
 
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost);
+    curl_easy_setopt(curl ,CURLOPT_TIMEOUT,300);//300s
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,server_return_funtion);
     
     curl_easy_setopt(curl,CURLOPT_WRITEDATA,(void*)server_ret_msg);
@@ -278,7 +279,8 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     /* then cleanup the formpost chain */
     curl_formfree((struct curl_httppost*)formpost);
 
-    log("server reg msg: %s \n",server_ret_msg);
+    log("server reg msg: file<%s> %s \n",file_info->file_name, server_ret_msg);
+
     if(strlen(server_ret_msg) != 0)
         ret  = 0;
     else
