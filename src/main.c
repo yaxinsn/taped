@@ -98,6 +98,8 @@ int main(int argc,char* argv[])
 	pthread_t sniffer_skinny;
 
 
+    printf("taped compile at %s %s!!\n",__DATE__,__TIME__);
+
 	main_log_fp = fopen(MAIN_LOG_FILE,"a+");
     if(main_log_fp == NULL){
         printf("main log file not open \n");
