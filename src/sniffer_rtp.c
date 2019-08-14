@@ -757,15 +757,19 @@ int cul_rtp_end_time(struct rtp_session_info* n)
     u32 duration;
 
     time_t a;
-    struct tm* tt;
+    struct tm tt;
     a = mktime(&n->ring_time);
-    
+
     duration = n->stop_time_stamp - n->start_time_stamp;
 
     a += duration;
+    if(duration > 60*10)
+    {
 
-    tt = localtime(&a);
-    memcpy(&n->end_time,tt,sizeof(struct tm));
+    	log("the ring time >10minites?  thread %lu \n",n->thread_id);
+    }
+    localtime_r(&a,&tt);
+    memcpy(&n->end_time,&tt,sizeof(struct tm));
     return 0;
 }
 /*
@@ -1300,13 +1304,17 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
     INIT_LIST_HEAD(&rs->called_mix_list_st._list_a);
     INIT_LIST_HEAD(&rs->called_mix_list_st._list_b);
 
-     rs->called_mix_list_st.linear_buf_list = 
+     rs->called_mix_list_st.linear_buf_list =
         &rs->called_mix_list_st._list_a;
 /*get the ring time */
+{
+
+	struct tm t;
     time(&a);
+    localtime_r(&a,&t);
 
-    memcpy(&rs->ring_time,localtime(&a),sizeof(struct tm));;
-
+    memcpy(&rs->ring_time,&t,sizeof(struct tm));;
+}
     rs->start_time_stamp = a;
     rs->call_dir = ss->mode;
     memcpy(&rs->called,&ss->called,sizeof(ss->called));

@@ -37,11 +37,11 @@ void __local_time_str(char* time_str,int len)
 
 
 	time_t a;
-	struct tm* t;
-	
+	struct tm t;
+
 	time(&a);
-	t = localtime(&a);
-	strftime(time_str,len,"%Y-%m-%d_%H-%M-%S",t);
+    localtime_r(&a,&t);
+	strftime(time_str,len,"%Y-%m-%d_%H-%M-%S",&t);
 //printf("%s	\n",time_str);
 
 }
