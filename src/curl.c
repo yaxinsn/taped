@@ -21,9 +21,11 @@ typedef unsigned char BYTE;
 
 #define TOHEX(x) ((x)>9 ? (x)+55 : (x)+48)
 void URLEncode(char* szIn, char** pOut);
-void set_up_formpost(curl_httppost** formpost,curl_httppost** lastptr)
+int set_up_formpost(curl_httppost** formpost,curl_httppost** lastptr)
 {
-	
+
+
+  CURLFORMcode ret;
 
   /* Fill in the submit field too, even if this is rarely needed */
   curl_formadd((curl_httppost**)formpost,

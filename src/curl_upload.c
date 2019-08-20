@@ -29,87 +29,148 @@
 #if 1
 #define TOHEX(x) ((x)>9 ? (x)+55 : (x)+48)
 
-void set_up_formpost(struct curl_httppost** formpost,struct curl_httppost** lastptr,
+int set_up_formpost(struct curl_httppost** formpost,struct curl_httppost** lastptr,
     struct upload_file_info* info)
 {
-	
+
+    CURLFORMcode ret;
+
     char path_and_filename[256]={0};
   /* Fill in the submit field too, even if this is rarely needed */
-  curl_formadd((struct curl_httppost**)formpost,
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_LOCAL_NUMBER",
                CURLFORM_COPYCONTENTS, info->call_local_number,
                CURLFORM_END);
-
-  curl_formadd((struct curl_httppost**)formpost,
+  if(ret != CURL_FORMADD_OK)
+  {
+    return -1;
+  }
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_CALLER_NUMBER",
                CURLFORM_COPYCONTENTS, info->call_caller_number,
                CURLFORM_END);
-  
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_CALLEE_NUMBER",
                CURLFORM_COPYCONTENTS, info->call_callee_number,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALLEE_GROUP_NUMBER",
                CURLFORM_COPYCONTENTS, info->called_group_number,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_DIRECTION",
                CURLFORM_COPYCONTENTS, info->call_direction,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "BOX_MAC",
                CURLFORM_COPYCONTENTS, info->box_id,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_BEGINTIME",
                CURLFORM_COPYCONTENTS, info->call_begin_time,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret =  curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "CALL_ENDTIME",
                CURLFORM_COPYCONTENTS,  info->call_end_time,
                CURLFORM_END);
 
-    curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+    ret =  curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "SECRET",
                CURLFORM_COPYCONTENTS, "1",
                CURLFORM_END);
-               
-      curl_formadd((struct curl_httppost**)formpost,
+
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+      ret =  curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "SERIAL_NO",
                CURLFORM_COPYCONTENTS, info->frag_serial_no,
                CURLFORM_END);
 
-      curl_formadd((struct curl_httppost**)formpost,
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+
+      ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
                CURLFORM_COPYNAME, "FRAG_FLAG",
                CURLFORM_COPYCONTENTS, info->frag_flag,
                CURLFORM_END);
-             
-    sprintf(path_and_filename,"%s",info->file_name);
 
-    curl_formadd((struct curl_httppost**)formpost,
-               (struct curl_httppost**)lastptr,
-               CURLFORM_COPYNAME, info->file_name,
-               CURLFORM_FILE, path_and_filename,
-               CURLFORM_FILENAME, info->file_name,
-               CURLFORM_END);
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
+    if(info->file_name[0] != '\0')
+    {
+        sprintf(path_and_filename,"%s",info->file_name);
+
+        ret = curl_formadd((struct curl_httppost**)formpost,
+                   (struct curl_httppost**)lastptr,
+                   CURLFORM_COPYNAME, info->file_name,
+                   CURLFORM_FILE, path_and_filename,
+                   CURLFORM_FILENAME, info->file_name,
+                   CURLFORM_END);
+        if(ret != CURL_FORMADD_OK)
+        {
+            return -1;
+        }
+    }
+    return 0;
 }
 
 #endif
@@ -241,7 +302,13 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
   int ret = 0;
   CURLcode res = CURLE_OK; 
 
-  set_up_formpost((struct curl_httppost**)&formpost,(struct curl_httppost**)&lastptr,file_info);
+  ret = set_up_formpost((struct curl_httppost**)&formpost,(struct curl_httppost**)&lastptr,file_info);
+  if(ret != 0)
+  {
+
+    log_err("set_up_formpost failed  and not try again!!!\n");
+    return 0;
+  }
 
   curl = curl_easy_init();
 //  multi_handle = curl_multi_init();
