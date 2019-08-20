@@ -362,13 +362,13 @@ int parse_sip_number(char* src,char** dest)
     char* e;
     if(*dest)
         return 0;
-    p = strstr(src,"<sip:");
+    p = strstr(src,"sip:");
     if(p)
     {
         e = strchr(p,'@');
         if(e)
         {
-            p+=strlen("<sip:");
+            p+=strlen("sip:");
             *e=0;
             *dest = strndup(p,e-p);
             *e='@';
