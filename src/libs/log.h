@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <sys/errno.h>
+#include <pthread.h>
 
 void _logger_file(const char* file_name, const char* func, int line, const char* fmt,...);
 
@@ -18,14 +19,14 @@ extern FILE* main_log_fp;
 #define MAIN_LOG_FILE "/home/root/hzivy-main.log"
 
 #define log(fmt,...)  \
-    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,fmt,##__VA_ARGS__);  
-    
+    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,"pthread %lu |"fmt,pthread_self(),##__VA_ARGS__);
+
 #define log_err(fmt,...)  \
-    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,"ERROR| "fmt,##__VA_ARGS__); 
+    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,"ERROR| pthread %lu | "fmt,pthread_self(),##__VA_ARGS__);
 
 
 #define log_errno(fmt,...)  \
-    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,"ERROR| errnoinfo <%s> | "fmt,strerror(errno),##__VA_ARGS__); 
+    _logger_file2(main_log_fp,MAIN_LOG_FILE,__func__,__LINE__,"ERROR| pthread %lu | errnoinfo <%s> | "fmt,pthread_self(),strerror(errno),##__VA_ARGS__);
 
 
 	
