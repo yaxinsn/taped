@@ -111,6 +111,7 @@ int main(int argc,char* argv[])
 	main_get_config();
 	log("get config and upload \n");
 
+	log("taped compile at %s %s!!\n",__DATE__,__TIME__);
 	init_device_hostip();
 	
 	init_ntpd();
