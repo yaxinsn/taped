@@ -80,6 +80,7 @@ struct session_info* si_find_session(char* call_id)
 int session_init()
 {
     INIT_LIST_HEAD(&sip_ctx.si_head);
+    pthread_mutex_init(&sip_ctx.head_lock, NULL);
 	return 0;
 }
 

@@ -12,10 +12,13 @@
 #include <arpa/inet.h>
 #include "log.h"
 #include <arpa/inet.h>
+#include <semaphore.h>
+#include <time.h>
 
-#include <pthread.h>    
+#include <pthread.h>
 
-#include "sniffer_lib.h"  
+#include "sniffer_lib.h"
+#include "types_.h"
 
 //#include <linux/in.h>
 #include "config.h"
@@ -55,6 +58,7 @@ struct rtp_session_info
     
     struct list_head node;
     pthread_t   thread_id;
+    u32         my_thread_id;
     pcap_t*     pd;
    
     int     call_dir; /// is same the ss mode.
@@ -111,9 +115,14 @@ struct rtp_session_info
      int mix_file_frag_count;
     // int mix_file_frag_info_caller;  //   0 is user hung up. the rtp is stop;   1 is session_talking_2
      int session_id;
+ //    pthread_mutex_t exit_flag_lock;
      int exit_flag;
 	 char called_group_number[64];
 	 int no_send_mix_file; // 1 is no_send_mix_file;
+
+     sem_t _kill_signal_event;
+
+//     pthread_mutex_t kill_signal_lock;
 };
 
 pthread_t setup_rtp_sniffer(struct session_info* ss);
