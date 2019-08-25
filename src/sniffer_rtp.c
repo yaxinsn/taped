@@ -55,6 +55,7 @@ struct rtp_ctx_t
 
     struct list_head rtp_head;
     u32     count;
+    u32     increase;
 
 };
 struct rtp_ctx_t rtp_ctx;
@@ -73,11 +74,17 @@ struct rtp_session_info* _rtp_new_session(void)
     list_add(&rs->node,&rtp_ctx.rtp_head);
     pthread_mutex_unlock(&rtp_ctx.head_lock);
     rtp_ctx.count++;
-    rs->my_thread_id =  rtp_ctx.count;
+    rtp_ctx.increase++;
+    if(rtp_ctx.increase == 0)
+    {
+        rtp_ctx.increase = 1;
+    }
+    rs->my_thread_id =  rtp_ctx.increase;
+
     rs->exit_flag = 0;
     return rs;
 }
-void _rtp_del_session(struct rtp_session_info* si)
+static void _rtp_del_session(struct rtp_session_info* si)
 {
 
     pthread_mutex_lock(&rtp_ctx.head_lock);
@@ -94,11 +101,12 @@ void _rtp_del_session(struct rtp_session_info* si)
     }
     return;
 }
-struct rtp_session_info* _rtp_find_session(pthread_t   thread_id)
+struct rtp_session_info* rtp_find_session(void)
 {
     struct rtp_session_info* p;
     struct rtp_session_info* n;
     struct list_head* rtp_head;
+    pthread_t   thread_id = pthread_self();
     rtp_head = &rtp_ctx.rtp_head;
 
     list_for_each_entry_safe(p,n,rtp_head,node)
@@ -110,7 +118,7 @@ struct rtp_session_info* _rtp_find_session(pthread_t   thread_id)
     }
     return NULL;
 }
-struct rtp_session_info* _rtp_find_session_by_my_pthead_ig(u32   my_thread_id)
+struct rtp_session_info* rtp_find_session_by_my_pthead_id(u32   my_thread_id)
 {
     struct rtp_session_info* p;
     struct rtp_session_info* n;
@@ -994,7 +1002,7 @@ static void sighandler(int s)
     struct rtp_session_info* n;
 
     log("I(%lu) recv a signal %d\n",pthread_self(),s);
-    n = _rtp_find_session(pthread_self());
+    n = rtp_find_session();
     if(n)
     {
         log("I(%lu) find the session info and finish it,but not exit\n",pthread_self());
@@ -1035,7 +1043,7 @@ static void sighandler(int s)
         char calledip_str[30]={0};
         char callingip_str[30]={0};
 
-        n = _rtp_find_session(pthread_self());
+        n = rtp_find_session(pthread_self());
         if(n)
         {
         log("I  find rtp session -------n->rtp_typ %d-----\n",n->rtp_type);
@@ -1086,7 +1094,7 @@ static void sighandler(int s)
 
 }
 #endif
-int thread_kill(pthread_t thread_id)
+static int thread_kill(u32 my_thread_id)
 {
 
     int kill_ret;
@@ -1094,12 +1102,11 @@ int thread_kill(pthread_t thread_id)
     struct rtp_session_info* n;
     struct rtp_session_info* rtp_check_again;
     struct timespec ts;
-    u32 my_thread_id = 0;
-    n = _rtp_find_session(thread_id);
+    n = rtp_find_session_by_my_pthead_id(my_thread_id);
     if(n)
     {
-        my_thread_id = n->my_thread_id;
-        log("I(%lu) will set (%lu)'s exit_flag before sem_timedwait _kill_signal_event \n",pthread_self(),thread_id);
+        log("I(%lu) will set (%lu)'s exit_flag before sem_timedwait _kill_signal_event \n",
+                pthread_self(),my_thread_id);
         struct timeval tv;
         if(gettimeofday(&tv, NULL) == 0)
         {
@@ -1125,7 +1132,7 @@ int thread_kill(pthread_t thread_id)
             {
                 log_err("sem_timedwait time out,so return from thread_kill\n");
                 //在此不可以再使用thread_id进行查询，很有可能查到另一个新的线程的信息。
-                rtp_check_again = _rtp_find_session_by_my_pthead_ig(my_thread_id);
+                rtp_check_again = rtp_find_session_by_my_pthead_id(my_thread_id);
                 if(rtp_check_again == NULL)
                 {
                     log("this rtp thread is destory! \n");
@@ -1141,9 +1148,9 @@ int thread_kill(pthread_t thread_id)
         else
         {
 kill:
-            log("I(%lu) set (%lu)'s exit_flag \n",pthread_self(),thread_id);
+            log("I(%lu) set (%lu)'s exit_flag \n",pthread_self(),my_thread_id);
 
-            kill_ret = pthread_kill(thread_id,SIGQUIT);
+            kill_ret = pthread_kill(n->thread_id,SIGQUIT);
                 //log("%s:%d ret %d \n",__func__,__LINE__,kill_ret);
             if(kill_ret == ESRCH)
             {
@@ -1170,13 +1177,14 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 
 	//time(&ss->stop_time_stamp);
     struct rtp_session_info* n;
-	if(rtp_sniffer_tid)
+	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
+	if(rtp_my_pthread_id)
 	{
 
-		log(" I (%lu) kill %lu thread(rtp) \n",(unsigned long)pthread_self()
-				,(unsigned long)rtp_sniffer_tid);
+		log(" I (%lu) kill  No<%lu> thread(rtp) \n",(unsigned long)pthread_self()
+				,(unsigned long)rtp_my_pthread_id);
 #if 1
-		n = _rtp_find_session(rtp_sniffer_tid);
+		n = rtp_find_session_by_my_pthead_id(rtp_my_pthread_id);
 		if(n)
 		{
 
@@ -1186,7 +1194,7 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 		}
 #endif
 
-		thread_kill(rtp_sniffer_tid);
+		thread_kill(rtp_my_pthread_id);
 	}
 }
 
@@ -1199,13 +1207,15 @@ void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
 
 	//time(&ss->stop_time_stamp);
 	struct rtp_session_info* n;
-	if(rtp_sniffer_tid)
+
+	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
+	if(rtp_my_pthread_id)
 	{
 
-		log(" I (%lu) kill %lu thread(rtp) \n",(unsigned long)pthread_self()
-				,(unsigned long)rtp_sniffer_tid);
+		log(" I (%lu) kill No<%lu> thread(rtp) \n",(unsigned long)pthread_self()
+				,(unsigned long)rtp_my_pthread_id);
 #if 1
-		n = _rtp_find_session(rtp_sniffer_tid);
+		n = rtp_find_session_by_my_pthead_id(rtp_my_pthread_id);
 		if(n)
 		{
 
@@ -1215,7 +1225,7 @@ void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
 		}
 #endif
 
-		thread_kill(rtp_sniffer_tid);
+		thread_kill(rtp_my_pthread_id);
 	}
 }
 void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
@@ -1225,13 +1235,14 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 
 	//time(&ss->stop_time_stamp);
 	struct rtp_session_info* n;
-	if(rtp_sniffer_tid)
+	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
+	if(rtp_my_pthread_id)
 	{
 
-		log(" I (%lu) kill %lu thread(rtp) \n",
-		    (unsigned long)pthread_self(),(unsigned long)rtp_sniffer_tid);
+		log(" I (%lu) kill  No<%lu> thread(rtp) \n",
+		    (unsigned long)pthread_self(),(unsigned long)rtp_my_pthread_id);
 #if 1
-		n = _rtp_find_session(rtp_sniffer_tid);
+		n = rtp_find_session_by_my_pthead_id(rtp_my_pthread_id);
 		if(n)
 		{
 
@@ -1241,7 +1252,7 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 		}
 #endif
 
-		thread_kill(rtp_sniffer_tid);
+		thread_kill(rtp_my_pthread_id);
 	}
 }
 
@@ -1261,7 +1272,7 @@ static void sniffer_handle_rtp(u_char * user, const struct pcap_pkthdr * packet_
 	int ret = 0;
 	{
     	struct rtp_session_info* n;
-        n = _rtp_find_session(pthread_self());
+        n = rtp_find_session();
         if(n)
         {
             if(n->exit_flag)
@@ -1334,7 +1345,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
 	sprintf(callingip_str,"%s",inet_ntoa(ss->calling.ip));
 	sprintf(calledip_str,"%s",inet_ntoa(ss->called.ip));
 
-	sprintf(filter,"(udp and host %s and port %d ) or (udp and host %s and port %d ) ",
+	sprintf(filter,"(udp and host %s and port %d) or (udp and host %s and port %d)",
 	    callingip_str,
 	    ss->calling.port,
 	       calledip_str,
@@ -1346,7 +1357,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
 	}
     return pd;
 }
-pthread_t setup_rtp_sniffer(struct session_info* ss)
+u32 setup_rtp_sniffer(struct session_info* ss)
 {
 	pthread_t tid;
 	pcap_t* pd;
@@ -1441,7 +1452,7 @@ pthread_t setup_rtp_sniffer(struct session_info* ss)
 
     pthread_detach(tid);//线程与sip线程分离。
 
-	return tid;
+	return rs->my_thread_id;
 
 }
 

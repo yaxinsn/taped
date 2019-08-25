@@ -125,7 +125,7 @@ struct rtp_session_info
 //     pthread_mutex_t kill_signal_lock;
 };
 
-pthread_t setup_rtp_sniffer(struct session_info* ss);
+u32 setup_rtp_sniffer(struct session_info* ss);
 /*
 结束整个通话的会话。就是用户挂机时的处理。
 不是RTP通信的结束。
@@ -139,7 +139,8 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid);
 
 void rtp_sniffer_init(void);
 //void update_rtp_session_number(struct session_info* ss);
-struct rtp_session_info* _rtp_find_session(pthread_t   thread_id);
+struct rtp_session_info* rtp_find_session(void);
+struct rtp_session_info* rtp_find_session_by_my_pthead_id(u32   my_thread_id);
 
 #endif //SNIFFER_RTP_H_
 

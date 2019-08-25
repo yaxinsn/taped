@@ -545,11 +545,11 @@ void close_skinny_media(skinny_media_info* sm,
     sm,sm->passThruPartyID);
     if(skinny_callRefer_info->skinny_media_list_num == 1)
     {
-        close_dial_session_sniffer_lastone(sm->session_comm_info.rtp_sniffer_tid);
+        close_dial_session_sniffer_lastone(sm->session_comm_info.rtp_sniffer_id);
     }
     else
     {
-    close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_tid);
+        close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_id);
     }
         __skinny_del_media(skinny_callRefer_info,sm);
 }
@@ -653,17 +653,17 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
 	    inet_ntoa(sm->session_comm_info.called.ip),sm->session_comm_info.called.port,sm->session_comm_info.called.number);
 
     sm->session_comm_info.serial_no = sm->pfather->skinny_serial_no;
-    if(0 == sm->session_comm_info.rtp_sniffer_tid)
+    if(0 == sm->session_comm_info.rtp_sniffer_id)
     {
 
-        sm->session_comm_info.rtp_sniffer_tid = setup_rtp_sniffer(&sm->session_comm_info);
+        sm->session_comm_info.rtp_sniffer_id = setup_rtp_sniffer(&sm->session_comm_info);
         skinny_log("_-_-_----- passThruPartyID (%u)'s rtp_sniffer_tid %u\n",
-        sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_tid);
+        sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_id);
     }
     else
     {
         skinny_log("_-_-_----- passThruPartyID (%u) has rtp_sniffer_tid %u, not need create again\n",
-            sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_tid);
+            sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_id);
     }
 
 
@@ -843,7 +843,7 @@ void handle_startMediaTransmissionACK(
     		goto END;
     	}
     	
-    	close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_tid);
+    	close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_id);
     }
  END:
  	return -1;
@@ -1135,16 +1135,16 @@ void __update_rtp_session_number (
 	struct skinny_callReference_info* skinny_callRefer_info)
 {
 	struct rtp_session_info* n;
-	
-	if(media_info->session_comm_info.rtp_sniffer_tid)
+
+	if(media_info->session_comm_info.rtp_sniffer_id)
 	{
-		n = _rtp_find_session(media_info->session_comm_info.rtp_sniffer_tid);
+		n = rtp_find_session_by_my_pthead_id(media_info->session_comm_info.rtp_sniffer_id);
 		if(n)
 		{
 			skinny_log("I(%u) update (%u)'s calling and called number \n",
 				pthread_self(),
-				media_info->session_comm_info.rtp_sniffer_tid);
-			strncpy(n->called.number, 
+				media_info->session_comm_info.rtp_sniffer_id);
+			strncpy(n->called.number,
 			skinny_callRefer_info->called_number,
 			sizeof(n->called.number));
 			

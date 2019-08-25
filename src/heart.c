@@ -61,7 +61,7 @@ void* heart_loop(void* arg)
         system(cmd);
     }
 	
-
+    return NULL;
 }
 pthread_t heart_start(void)
 {

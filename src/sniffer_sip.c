@@ -668,13 +668,13 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
                     	strncpy(ss->called.number,
                     		spkt_p->msg_hdr.to_number,
                     		sizeof(ss->called.number));
-                    
+
                     }
-					if(ss->rtp_sniffer_tid == 0){
-                    
+					if(ss->rtp_sniffer_id == 0){
+
                         sip_log("this sip session (%s) 's rtp not exist, setup rtp pthread\n",
                                 ss->call_id);
-                        ss->rtp_sniffer_tid = setup_rtp_sniffer(ss);
+                        ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
                     }
                     else
                     {
@@ -724,12 +724,12 @@ void _update_session(struct sip_pkt* spkt_p)
                     strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
                     sip_log("I find the session (callid %s) calling number: %s \n",
                             ss->call_id,ss->calling.number);
-                            
-                     if(ss->rtp_sniffer_tid == 0)
+
+                     if(ss->rtp_sniffer_id == 0)
                      {
                         sip_log("this sip session (%s) 's rtp not exist, setup rtp pthread\n",
                                 ss->call_id);
-                        ss->rtp_sniffer_tid = setup_rtp_sniffer(ss);
+                        ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
                     }
                     else
                     {
@@ -772,8 +772,8 @@ void _close_session(struct sip_pkt* spkt_p)
         {
             sip_log("I find the session (callid %s),and close it. \n",ss->call_id);
  //           ss->state = spkt_p->state;
-            
-            close_dial_session_sniffer_lastone(ss->rtp_sniffer_tid);
+
+            close_dial_session_sniffer_lastone(ss->rtp_sniffer_id);
         }
         else
         {
@@ -844,7 +844,7 @@ int handle_sip_pkt_content(void* sip_payload,int len)
 	char* mesg_header;
 	char* mesg_body;
 	//char* sip = malloc(htons(udph->len));
-	char* sip = malloc((len));
+	char* sip = (char*)malloc((len));
 	if(sip == NULL)
 		return -1;
 	memcpy(sip,(u8*)sip_payload,len);

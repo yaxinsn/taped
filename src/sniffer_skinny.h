@@ -134,5 +134,8 @@ static const value_string DCallState[] = {
 #define SKINNY_CALLSTATE_CONNECTED 0x05
 #define SKINNY_CALLSTATE_Proceed   0x0c
 
+
+
+#define BINGXI_PERFIX_NUMBER_STR "*98"
 #endif //_SNIFFER_SKINNY_H
 

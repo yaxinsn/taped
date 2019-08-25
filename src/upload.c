@@ -71,7 +71,7 @@ upload_ctx_t  upload_ctx;
 
 static int __upload_msg_handle(void* msg,int len,struct msg_engine_ctx* me)
 {
-	struct upload_msg* pm = msg;
+	struct upload_msg* pm = (struct upload_msg*)msg;
     upload_ctx_t* upload_s;
     char file_name[300]={0};
     int ret;
