@@ -80,9 +80,10 @@ typedef struct skinny_callReference_info
     
     int 			skinny_state;//1 = ;2=onHOOK(挂机)
     int 			skinny_callstate_connected;
-    int 			skinny_serial_no;
+    u32 			skinny_serial_no;
     struct list_head skinny_media_list;
     int         skinny_media_list_num;
+    int         bingxi_flag;
 
 }skinny_callRefer;
 

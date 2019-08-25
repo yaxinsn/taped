@@ -1080,6 +1080,8 @@ void handle_CallState(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
         if(skinny_callRefer_info ==NULL)
             return;
    		skinny_callRefer_info->call_id = callReference;
+
+        skinny_log("skinny_new_session callid %u skinny_serial_no %u\n",callReference,skinny_callRefer_info->skinny_serial_no);
     }
 
     skinny_log("enter callid %u\n",callReference);
@@ -1258,15 +1260,28 @@ void handle_callinfo2_function(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     }
     else
     {
-      skinny_log("calledParty is changed from <%s> to <%s> \n",skinny_callRefer_info->called_number,calledParty);
+    /* SCCP为主叫时， calledNumber
+    会来回变化，这样需要找到一个如何更新组号的机制。--2019-8-22*/
+      skinny_log("calledParty will be changed from <%s> to <%s> \n",skinny_callRefer_info->called_number,calledParty);
       if(skinny_callRefer_info->skinny_callstate_connected == 1)
       {
-        skinny_log("callstate is connected, update the called number\n");
-        strncpy(skinny_callRefer_info->called_group_number,
-          skinny_callRefer_info->called_number,sizeof(skinny_callRefer_info->called_group_number));
-        /* update the new called number ....2018-12-3 */
-        strncpy(skinny_callRefer_info->called_number,calledParty,
-            sizeof(skinny_callRefer_info->called_number));
+        skinny_log("callstate is connected, must update the called number, old called_number --> called_group_number; "\
+                    "  new calledParty --> called_number 2019-8-22\n");
+        if (strncmp(BINGXI_PERFIX_NUMBER_STR,skinny_callRefer_info->called_number,strlen(BINGXI_PERFIX_NUMBER_STR)))
+        {
+
+            strncpy(skinny_callRefer_info->called_group_number,
+              skinny_callRefer_info->called_number,sizeof(skinny_callRefer_info->called_group_number));
+            /* update the new called number ....2018-12-3 */
+            strncpy(skinny_callRefer_info->called_number,calledParty,
+                sizeof(skinny_callRefer_info->called_number));
+        }
+        else
+        {
+            skinny_callRefer_info->bingxi_flag =1;
+            skinny_log("but, old called_number is 并席 *98, so Can't update the called_number and"\
+                        "called_group_number 2019-8-22\n");
+        }
 
       }
     }
@@ -1285,8 +1300,15 @@ void handle_callinfo2_function(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
         }
         else
         {
-            strncpy(skinny_callRefer_info->calling_number,callingParty,
-                sizeof(skinny_callRefer_info->calling_number));
+            if(skinny_callRefer_info->bingxi_flag != 1)
+            {
+                strncpy(skinny_callRefer_info->calling_number,callingParty,
+                       sizeof(skinny_callRefer_info->calling_number));
+            }
+            else
+            {
+                skinny_log("skinny_callRefer_info->bingxi_flag is 1,so can't upgrade the calling_number 2019-8-22\n");
+            }
         }
     }
 
@@ -1359,8 +1381,8 @@ void handle_DialedNumber(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
 	skinny_callRefer_info = skinny_new_session();
 	if(skinny_callRefer_info ==NULL)
 	    return;
-
 	skinny_callRefer_info->call_id = callReference;
+    skinny_log("skinny_new_session callid %u skinny_serial_no %u\n",callReference,skinny_callRefer_info->skinny_serial_no);
 	if(skinny_callRefer_info ==  NULL)
 	{
 		skinny_log_err("no this callid %u session\n",callReference);
