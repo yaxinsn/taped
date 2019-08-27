@@ -1,0 +1,10 @@
+﻿5.0.11
+1 增加了skinny_del_session里检查skinn_session个数的日志。
+2.close_skinny_session_by_Callid里del skinny session.
+3. 不在使用handle_clear_prompt_status。
+4. 在stop_media_transmistssion的stop_oneMedia时，发现了如果只有一个RTP会话，则直接使用close_dial_session_sniffer_lastone。
+5. handle_CallState里的onHook过程，来关闭整个skinny session.调用close_skinny_session_by_Callid
+5.0.11
+6， handle_DialedNumber中要先判断是否skinny_find_session,再新建skinny_session。 
+7.  在mix文件名称中增加mythreadid。
+

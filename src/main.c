@@ -36,7 +36,7 @@ main.c
 #include "sniffer_rtp.h"
 #include "sniffer_skinny.h"
 
-
+#define VERSION "5.0.11"
 extern pthread_t heart_start(void);
 
 int main_log(const char* s)
@@ -98,7 +98,7 @@ int main(int argc,char* argv[])
 	pthread_t sniffer_skinny;
 
 
-    printf("taped compile at %s %s!!\n",__DATE__,__TIME__);
+    printf("taped compile %s at %s %s!!\n",VERSION,__DATE__,__TIME__);
 
 	main_log_fp = fopen(MAIN_LOG_FILE,"a+");
     if(main_log_fp == NULL){
@@ -106,12 +106,12 @@ int main(int argc,char* argv[])
         main_log("main log file not open");
         exit(1);
     }
-    
+
 	log("test get config and upload \n");
 	main_get_config();
 	log("get config and upload \n");
 
-	log("taped compile at %s %s!!\n",__DATE__,__TIME__);
+	log("taped compile %s at %s %s!!\n",VERSION,__DATE__,__TIME__);
 	init_device_hostip();
 	
 	init_ntpd();

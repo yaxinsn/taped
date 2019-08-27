@@ -36,6 +36,8 @@ extern FILE* skinny_log_fp;
 #define skinny_log_err(fmt,...)  \
             skinny_log("ERROR|"fmt,##__VA_ARGS__); 
 
+#define skinny_log_mayerr(fmt,...)  \
+            skinny_log("MAYERROR|"fmt,##__VA_ARGS__);
 enum skinny_session_state
 {
         SESSION_K,

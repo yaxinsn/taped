@@ -403,6 +403,7 @@ static struct skinny_callReference_info* skinny_new_session(void)
     pthread_mutex_lock(&skinny_ctx.head_lock);
     skinny_callRefer_info->skinny_serial_no = g_skinny_serial_no;
     g_skinny_serial_no++;
+    skinny_ctx.count++;
     list_add(&skinny_callRefer_info->node,&skinny_ctx.si_head);
     pthread_mutex_unlock(&skinny_ctx.head_lock);
     return skinny_callRefer_info;
@@ -412,6 +413,11 @@ void skinny_del_session(struct skinny_callReference_info* si)
     pthread_mutex_lock(&skinny_ctx.head_lock);
     //FREE(si->call_id);
     list_del(&si->node);
+    skinny_ctx.count--;
+    if( g_skinny_serial_no % 20 == 0)
+    {
+        skinny_log("### current skinny-session-count %d ###\n", skinny_ctx.count);
+    }
     pthread_mutex_unlock(&skinny_ctx.head_lock);
     FREE(si);
     return;
@@ -566,11 +572,11 @@ void close_skinny_session_by_Callid(u32 callid)
         
     	__skinny_foreach_media_list(skinny_callRefer_info,close_skinny_media);
         
+        skinny_del_session(skinny_callRefer_info);
     }
     else
     {
         skinny_log_err("no this callid %u session\n",callid);
-        //exit(0);
     }
 
 }
@@ -608,10 +614,12 @@ void handle_clear_prompt_status(skinny_opcode_map_t* skinny_op,
     CW_LOAD_U32(lineInstance,p);
     CW_LOAD_U32(callRefer,p);
     skinny_log("enter\n");
+    return;//此函数不再使用。使用callState里的onHook.2019-8-27
     skinny_info->callid = callRefer;
-   
 
 	close_skinny_session_by_Callid(callRefer);
+
+
 
 }
 
@@ -842,8 +850,17 @@ void handle_startMediaTransmissionACK(
     		skinny_log_err("find the media failed!@@@\n");
     		goto END;
     	}
-    	
-    	close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_id);
+         if(skinny_callRefer_info->skinny_media_list_num == 1)
+        {
+            close_dial_session_sniffer_lastone(sm->session_comm_info.rtp_sniffer_id);
+            __skinny_del_media(skinny_callRefer_info,sm);
+        }
+        else
+        {
+        //    close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_id);
+            close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_id);
+        }
+
     }
  END:
  	return -1;
@@ -1119,10 +1136,15 @@ void handle_CallState(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
       skinny_log(" process callstate Connected , I start the rtp sinnfer. callReference %d \n",callReference);
       __start_rtp_sniffer(skinny_callRefer_info);
     }
+    else if(callState == SKINNY_CALLSTATE_ONHOOK)
+    {
+    //这个onHook都会在stopMedie_stransmission的后面。
+        skinny_log("process callstate onHook,I close this skinny session callReference %d ,2019-8-27\n",callReference);
+	    close_skinny_session_by_Callid(callReference);
+    }
     else
     {
-      
-      skinny_log(" I callstate %d . \n",callState);
+        skinny_log(" I callstate %d . \n",callState);
     }
   	skinny_info->callstate = callState;
   	skinny_callRefer_info->skinny_state = callState;
@@ -1378,16 +1400,22 @@ void handle_DialedNumber(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
 
 	skinny_info->callid = callReference;
 
-	skinny_callRefer_info = skinny_new_session();
-	if(skinny_callRefer_info ==NULL)
-	    return;
-	skinny_callRefer_info->call_id = callReference;
+    skinny_callRefer_info=skinny_find_session(callReference);
+    if(skinny_callRefer_info == NULL)
+    {
+        skinny_callRefer_info = skinny_new_session();
+        if(skinny_callRefer_info ==  NULL)
+        {
+            skinny_log_err("no this callid %u session\n",callReference);
+            return;
+        }
+
+        skinny_callRefer_info->call_id = callReference;
+
+    }
+
     skinny_log("skinny_new_session callid %u skinny_serial_no %u\n",callReference,skinny_callRefer_info->skinny_serial_no);
-	if(skinny_callRefer_info ==  NULL)
-	{
-		skinny_log_err("no this callid %u session\n",callReference);
-		return;
-	}
+
 	skinny_callRefer_info->mode = SS_MODE_CALLING;
 	skinny_log("callid %u dailed number %u \n",callReference,dailed_num);
 

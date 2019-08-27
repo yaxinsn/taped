@@ -553,15 +553,15 @@ int linear_list_mix(struct rtp_session_info* rs)
 
     if(rs->call_dir == SS_MODE_CALLING)
     {
-        sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
+        sprintf(save_file_name,"/tmp/fromLocal_%s_to_%s_startTime_%s_No_%d_fragid_%d_thread_%lu_mythreadid_%u.mix",
                 calling_number,called_number,ring_time,
-                rs->session_id,rs->mix_file_frag_count,rs->thread_id);
+                rs->session_id,rs->mix_file_frag_count,rs->thread_id,rs->my_thread_id);
     }
     else
     {
-        sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d_thread_%lu.mix",
+        sprintf(save_file_name,"/tmp/from_%s_toLocal_%s_startTime_%s_No_%d_fragid_%d_thread_%lu_mythreadid_%u.mix",
                  calling_number,called_number,ring_time,
-                rs->session_id,rs->mix_file_frag_count,rs->thread_id);
+                rs->session_id,rs->mix_file_frag_count,rs->thread_id,rs->my_thread_id);
     }
 
     log("save file name %s \n",save_file_name);
@@ -1448,7 +1448,7 @@ u32 setup_rtp_sniffer(struct session_info* ss)
 	}
 	rs->thread_id = tid;
 
-	log("rs thread_id %lu gtid %lu\n",rs->thread_id);
+	log("rs thread_id %lu my_thread_id %lu\n",rs->thread_id,rs->my_thread_id);
 
     pthread_detach(tid);//线程与sip线程分离。
 

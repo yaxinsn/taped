@@ -19,7 +19,7 @@
 #include <linux/if_ether.h> //struct ethhdr
 
 #include <netinet/in.h>
-#include <netinet/ip.h> 
+#include <netinet/ip.h>
 
 #include <linux/udp.h>//struct udphdr
 
@@ -42,8 +42,8 @@ struct session_ctx_t
 {
     pthread_mutex_t head_lock;  //sync
 
-    struct list_head si_head;
-
+    struct list_head si_head; //sip与skinny都用这个session的结构，都两个的si_head挂的东东不一样。
+    u32              count;
 };
 struct session_info* si_new_session();
 void si_del_session(struct session_info* si);
@@ -72,12 +72,12 @@ struct session_info //与信令协议 sip ,skinny无关。是更高一级的应�
     char* call_id;  //这是sip的内容
     struct  person calling;
     struct  person called;
-    
+
     int mode; /* call direction   */ // 1是主叫，2是被叫。
     char    called_group_number[64];
     u32 rtp_sniffer_id;
     u32 serial_no;
-     
+
 }; /* 用于记录本次通信的两者的ip, port, 电话号码，用户名等等。*/
 
 
