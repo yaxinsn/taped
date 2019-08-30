@@ -8,3 +8,24 @@
 6， handle_DialedNumber中要先判断是否skinny_find_session,再新建skinny_session。 
 7.  在mix文件名称中增加mythreadid。
 
+5.0.11上发现的问题：
+5.0.11-A ： 
+在代答+并席过程中，在并席过程（三方通话，一人挂机变两人通话的过程中，少一个两人通话的录音）
+两人通话的过程中有start_media_transmission，无start_media_transmissionACK的报文，这样没有生成rtp的线程。
+从日志上看，收到handle_start_media_transmission和handle_callinfo2_function两个报文之的后，
+	日志开始处理 rtp线程开始处理信号，用于处理linear_list_mix+upload_the_mix_file的过程，同时启动了另一个upload线程（用于http上传文件）。upload_mix_file
+	怀疑是upload线程占用CPU太长时间，导致skinny-sniffer线程丢失了start_media_transmissionACK的报文。
+
+5.0.12
+1. 增加skinny_media_list_lock。操作skinny里的media-session（passThruPartyID为key）时，要进行保护。一般不保护也无问题。因为handle_start_media_transmission一般都是串行的。
+2.__start_rtp_sniffer改成为_skinny_start_rtp_sniffers
+
+
+4.针对5.0.11-A问题的修改：
+4.1 stop_oneMedia里的处理再修改回去。针对5.0.11里的4项修改。 为了解决5.0.11-A 的问题。暂时不上传并席之前三方通话的最后一个文件，而是在最后整个通话结束了，再上传。
+4.2 handle_start_media_transmission里增加日志，打印出 before new skinny-media-session callrefer。
+4.3 sniffer-rtp.c 里 finish_rtp中不再处理最后一文件。
+4.4 sniffer-rtp.c 里 sighandler中，只有(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)时才处理最后一文件。
+
+
+未来修改：可以增加pcap的buffer_size. pcap_set_buffer_size 要使用pcap_create.

@@ -400,6 +400,7 @@ static struct skinny_callReference_info* skinny_new_session(void)
         return NULL;
     memset(skinny_callRefer_info,0,sizeof(struct skinny_callReference_info));
     INIT_LIST_HEAD(&skinny_callRefer_info->skinny_media_list);
+    pthread_mutex_init(&skinny_callRefer_info->skinny_media_list_lock,NULL);
     pthread_mutex_lock(&skinny_ctx.head_lock);
     skinny_callRefer_info->skinny_serial_no = g_skinny_serial_no;
     g_skinny_serial_no++;
@@ -454,10 +455,10 @@ static skinny_media_info* __skinny_new_media(struct skinny_callReference_info* s
     if ( sm == NULL)
         return NULL;
     memset(sm,0,sizeof(skinny_media_info));
-   // pthread_mutex_lock(&sip_ctx.head_lock);
+    pthread_mutex_lock(&skinny_callRefer->skinny_media_list_lock);
     list_add_tail(&sm->node,&skinny_callRefer->skinny_media_list);
     skinny_callRefer->skinny_media_list_num++;
-    //pthread_mutex_unlock(&sip_ctx.head_lock);
+    pthread_mutex_unlock(&skinny_callRefer->skinny_media_list_lock);
     return sm;
 }
 void __skinny_del_media(skinny_callRefer* skinny_call, skinny_media_info* sm)
@@ -478,19 +479,19 @@ skinny_media_info* __skinny_find_media(skinny_callRefer* skinny_call, u32 passTh
     skinny_media_info* n;
     struct list_head* si_head;
     si_head = &skinny_call->skinny_media_list;
-    
+
+    pthread_mutex_lock(&skinny_call->skinny_media_list_lock);
     list_for_each_entry_safe(p,n,si_head,node)
     {
-
-        //if(!strcmp(passThruPartyID,p->passThruPartyID))
-        if(passThruPartyID ==p->passThruPartyID)
+        if(passThruPartyID == p->passThruPartyID)
         {
-        
-            //skinny_log("find passThruPartyID %s\n",passThruPartyID);
+
+        pthread_mutex_unlock(&skinny_call->skinny_media_list_lock);
             return p;
         }
     }
-    
+
+    pthread_mutex_unlock(&skinny_call->skinny_media_list_lock);
     skinny_log("ERROR: nofind passThruPartyID %u at skinnyCallRefencee %u \n",passThruPartyID,skinny_call->call_id);
     return NULL;
 }
@@ -502,12 +503,13 @@ void __skinny_foreach_media_list(struct skinny_callReference_info* skinny_callRe
     skinny_media_info* n;
 	struct list_head* si_head;
 	si_head = &skinny_callRefer_info->skinny_media_list;
+    pthread_mutex_lock(&skinny_callRefer_info->skinny_media_list_lock);
 
 	list_for_each_entry_safe(p,n,si_head,node)
 	{
-		
 		func(p,skinny_callRefer_info);
 	}
+    pthread_mutex_unlock(&skinny_callRefer_info->skinny_media_list_lock);
 
 }
 
@@ -647,12 +649,11 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
     		sm->session_comm_info.called_group_number);
     }
     
-	skinny_log("_-_-_-----\n");
+    skinny_log("^^^^-----\n");
     if((sm->session_comm_info.called.ip.s_addr !=0)
     	&&(sm->session_comm_info.calling.ip.s_addr !=0)
     	&&(skinny_callRefer_info->skinny_callstate_connected == 1))
 	{
-
     skinny_log("skinny(%u)_serial_no %d---\n",sm->pfather->call_id,sm->pfather->skinny_serial_no);
     skinny_log("skinny(%u) passThruPartyID %u\n",sm->pfather->call_id,sm->passThruPartyID);
     skinny_log("sniffer calling %s:%d phone_number %s \n",
@@ -677,7 +678,7 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
 
     }
 }
-void __start_rtp_sniffer(struct skinny_callReference_info* skinny_callRefer_info)
+void _skinny_start_rtp_sniffers(struct skinny_callReference_info* skinny_callRefer_info)
 {
 
 	skinny_log("_-_-_-----\n");
@@ -724,8 +725,8 @@ void handle_start_media_transmission(skinny_opcode_map_t* skinny_op, u8* msg,u32
     CW_LOAD_U32(qualifier_out.any_compressionType,p);
     
     CW_LOAD_U32(callRefer,p);
-    skinny_log("_-_-_----------- callrefer %u , Port %d  remoteIP %x \n",
-        callRefer,remotePort,remoteIpv4Address);
+    skinny_log("!! before new skinny-media-session callrefer %u passThruPartyID %u, Port %d  remoteIP %x 2019-8-30\n",
+        callRefer,passThruPartyID,remotePort,remoteIpv4Address);
 
     skinny_info->callid = callRefer;
 
@@ -743,14 +744,14 @@ void handle_start_media_transmission(skinny_opcode_map_t* skinny_op, u8* msg,u32
     
       if(skinny_callRefer_info->mode == SS_MODE_CALLING)
       {
-      
-          skinny_log("_-_-_-----I am master ------ callrefer %d , Port %d  remoteIP beijiao %x \n",
+          skinny_log("_-calling- callrefer %d , Port %d  remoteIP  %x \n",
             callRefer,remotePort,remoteIpv4Address);
           sm->session_comm_info.called.ip.s_addr = remoteIpv4Address;
           sm->session_comm_info.called.port = (remotePort);
       }
       else
-      {     skinny_log("_-_-_-----I am slave, ------ callrefer %d , Port %d  remoteIP is zhujiao %x \n",
+      {
+            skinny_log("_-called- callrefer %d , Port %d  remoteIP  %x \n",
             callRefer,remotePort,remoteIpv4Address);
   
           sm->session_comm_info.calling.ip.s_addr = remoteIpv4Address;
@@ -826,7 +827,7 @@ void handle_startMediaTransmissionACK(
           sm->session_comm_info.called.port = (Port);
       }
       sm->session_comm_info.mode = skinny_callRefer_info->mode;
-      __start_rtp_sniffer(skinny_callRefer_info);
+      _skinny_start_rtp_sniffers(skinny_callRefer_info);
     } 
     else
     {
@@ -850,16 +851,10 @@ void handle_startMediaTransmissionACK(
     		skinny_log_err("find the media failed!@@@\n");
     		goto END;
     	}
-         if(skinny_callRefer_info->skinny_media_list_num == 1)
-        {
-            close_dial_session_sniffer_lastone(sm->session_comm_info.rtp_sniffer_id);
-            __skinny_del_media(skinny_callRefer_info,sm);
-        }
-        else
-        {
-        //    close_dial_session_sniffer(sm->session_comm_info.rtp_sniffer_id);
-            close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_id);
-        }
+    	//在此不能关闭rtp线程，也不能把rtp的管理节点从skinny-session中删除,这是由于。-2019-8-28.
+    	//这个函数再修改回去。-2019-8-28.
+    	close_one_rtp_sniffer(sm->session_comm_info.rtp_sniffer_id);
+
 
     }
  END:
@@ -1134,7 +1129,7 @@ void handle_CallState(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
     {
       skinny_callRefer_info->skinny_callstate_connected = 1;
       skinny_log(" process callstate Connected , I start the rtp sinnfer. callReference %d \n",callReference);
-      __start_rtp_sniffer(skinny_callRefer_info);
+      _skinny_start_rtp_sniffers(skinny_callRefer_info);
     }
     else if(callState == SKINNY_CALLSTATE_ONHOOK)
     {

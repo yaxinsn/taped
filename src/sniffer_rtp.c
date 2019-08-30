@@ -953,13 +953,14 @@ static int finish_rtp(struct rtp_session_info* n)
     int retval=3;
 
     log("I(%lu)  enter finish_rtp \n",pthread_self());
+#if 0
     time(&n->stop_time_stamp);
     cul_rtp_end_time(n);
 
     handler_last_linear_list(n);
 
     rtp_may_destory(n);
-
+#endif
     //else
     {
         while(1)
@@ -982,7 +983,6 @@ static int finish_rtp(struct rtp_session_info* n)
 static int finish_rtp_in_signal(struct rtp_session_info* n)
 {
     int retval=3;
- //   pthread_mutex_lock(&n->exit_flag_lock);
 
     log("I(%lu)  enter finish_rtp_in_signal \n",pthread_self());
     time(&n->stop_time_stamp);
@@ -991,7 +991,6 @@ static int finish_rtp_in_signal(struct rtp_session_info* n)
     handler_last_linear_list(n);
 
     log("I(%lu)  exit finish_rtp_in_signal \n",pthread_self());
-//    pthread_mutex_unlock(&n->exit_flag_lock);
 
     return 0;
 }
@@ -1006,8 +1005,18 @@ static void sighandler(int s)
     if(n)
     {
         log("I(%lu) find the session info and finish it,but not exit\n",pthread_self());
-        finish_rtp_in_signal(n);
-        rtp_may_destory(n);
+        if(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)
+        {
+            finish_rtp_in_signal(n);
+            rtp_may_destory(n);
+        }
+        else
+        /* 在并席过程中，或是在skinny-session中有多个RTP时，
+        我们只在skinny-session结束时，才把所有的rtp生成的mix文件上传上去。
+        这是由于上传进程在工作时，有一些skinny的报文没有抓到。比较奇怪。*/
+        {
+            log("I(%lu) is the session info,not upload some mix file.\n",pthread_self());
+        }
 
     }
     else
