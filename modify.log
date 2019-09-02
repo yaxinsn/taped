@@ -28,4 +28,6 @@
 4.4 sniffer-rtp.c 里 sighandler中，只有(n->exit_flag >= RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD)时才处理最后一文件。
 
 
-未来修改：可以增加pcap的buffer_size. pcap_set_buffer_size 要使用pcap_create.
+5.0.13
+可以增加pcap的buffer_size. pcap_set_buffer_size 为20M。timeout为1000ms.
+

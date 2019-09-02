@@ -11,9 +11,166 @@
 
 void handle(u_char * user, const struct pcap_pkthdr * h, const u_char * p) ;
 
+#define HAVE_PCAP_CREATE
+#define warning printf
+int Bflag=20*1024*1024;
+static pcap_t *
+open_interface(const char *device, int snaplen,int to_ms, int Bflag,char *ebuf)
+{
+	pcap_t *pc;
+#ifdef HAVE_PCAP_CREATE
+	int status;
+	char *cp;
+#endif
+
+#ifdef HAVE_PCAP_CREATE
+	pc = pcap_create(device, ebuf);
+	if (pc == NULL) {
+		/*
+		 * If this failed with "No such device", that means
+		 * the interface doesn't exist; return NULL, so that
+		 * the caller can see whether the device name is
+		 * actually an interface index.
+		 */
+		if (strstr(ebuf, "No such device") != NULL)
+			return (NULL);
+		error("%s", ebuf);
+	}
+#ifdef HAVE_PCAP_SET_TSTAMP_TYPE
+	if (Jflag)
+		show_tstamp_types_and_exit(pc, device);
+#endif
+#ifdef HAVE_PCAP_SET_TSTAMP_PRECISION
+	status = pcap_set_tstamp_precision(pc, ndo->ndo_tstamp_precision);
+	if (status != 0)
+		error("%s: Can't set %ssecond time stamp precision: %s",
+			device,
+			tstamp_precision_to_string(ndo->ndo_tstamp_precision),
+			pcap_statustostr(status));
+#endif
+
+#ifdef HAVE_PCAP_SET_IMMEDIATE_MODE
+	if (immediate_mode) {
+		status = pcap_set_immediate_mode(pc, 1);
+		if (status != 0)
+			error("%s: Can't set immediate mode: %s",
+			device,
+			pcap_statustostr(status));
+	}
+#endif
+#if 0
+	/*
+	 * Is this an interface that supports monitor mode?
+	 */
+	if (pcap_can_set_rfmon(pc) == 1)
+		supports_monitor_mode = 1;
+	else
+		supports_monitor_mode = 0;
+#endif
+	status = pcap_set_snaplen(pc, snaplen);
+	if (status != 0)
+		error("%s: Can't set snapshot length: %s",
+		    device, pcap_statustostr(status));
+	status = pcap_set_promisc(pc, 1);
+	if (status != 0)
+		error("%s: Can't set promiscuous mode: %s",
+		    device, pcap_statustostr(status));
+#if 0
+	if (Iflag) {
+		status = pcap_set_rfmon(pc, 1);
+		if (status != 0)
+			error("%s: Can't set monitor mode: %s",
+			    device, pcap_statustostr(status));
+	}
+#endif
+
+	status = pcap_set_timeout(pc, to_ms);
+	if (status != 0)
+		error("%s: pcap_set_timeout failed: %s",
+		    device, pcap_statustostr(status));
 
 
 
+	if (Bflag != 0) {
+		status = pcap_set_buffer_size(pc, Bflag);
+		if (status != 0)
+			error("%s: Can't set buffer size: %s",
+			    device, pcap_statustostr(status));
+	}
+#ifdef HAVE_PCAP_SET_TSTAMP_TYPE
+	if (jflag != -1) {
+		status = pcap_set_tstamp_type(pc, jflag);
+		if (status < 0)
+			error("%s: Can't set time stamp type: %s",
+		              device, pcap_statustostr(status));
+	}
+#endif
+	status = pcap_activate(pc);
+	if (status < 0) {
+		/*
+		 * pcap_activate() failed.
+		 */
+		cp = pcap_geterr(pc);
+		if (status == PCAP_ERROR)
+			error("%s", cp);
+		else if (status == PCAP_ERROR_NO_SUCH_DEVICE) {
+			/*
+			 * Return an error for our caller to handle.
+			 */
+			pcap_close(pc);
+			snprintf(ebuf, PCAP_ERRBUF_SIZE, "%s: %s\n(%s)",
+			    device, pcap_statustostr(status), cp);
+			return (NULL);
+		} else if (status == PCAP_ERROR_PERM_DENIED && *cp != '\0')
+			error("%s: %s\n(%s)", device,
+			    pcap_statustostr(status), cp);
+		else
+			error("%s: %s", device,
+			    pcap_statustostr(status));
+	} else if (status > 0) {
+		/*
+		 * pcap_activate() succeeded, but it's warning us
+		 * of a problem it had.
+		 */
+		cp = pcap_geterr(pc);
+		if (status == PCAP_WARNING)
+			warning("%s", cp);
+		else if (status == PCAP_WARNING_PROMISC_NOTSUP &&
+		         *cp != '\0')
+			warning("%s: %s\n(%s)", device,
+			    pcap_statustostr(status), cp);
+		else
+			warning("%s: %s", device,
+			    pcap_statustostr(status));
+	}
+#ifdef HAVE_PCAP_SETDIRECTION
+	if (Qflag != -1) {
+		status = pcap_setdirection(pc, Qflag);
+		if (status != 0)
+			error("%s: pcap_setdirection() failed: %s",
+			      device,  pcap_geterr(pc));
+		}
+#endif /* HAVE_PCAP_SETDIRECTION */
+#else /* HAVE_PCAP_CREATE */
+	*ebuf = '\0';
+	pc = pcap_open_live(device, ndo->ndo_snaplen, !pflag, 1000, ebuf);
+	if (pc == NULL) {
+		/*
+		 * If this failed with "No such device", that means
+		 * the interface doesn't exist; return NULL, so that
+		 * the caller can see whether the device name is
+		 * actually an interface index.
+		 */
+		if (strstr(ebuf, "No such device") != NULL)
+			return (NULL);
+		error("%s", ebuf);
+	}
+	if (*ebuf)
+		warning("%s", ebuf);
+#endif /* HAVE_PCAP_CREATE */
+
+	return (pc);
+}
 //捕获的数据包内容由这个函数处理，这个回调函数的格式必须是下面的形式
 void handle(u_char * user, const struct pcap_pkthdr * packet_header, const u_char * packet_content)
 {
@@ -60,6 +217,7 @@ static int __set_nonblock(pcap_t* pd)
 	
 
 }
+#if 0
 /*
 open_pcap_file 
 device :指定网卡
@@ -99,9 +257,26 @@ pcap_t* open_pcap_file(const char* device,int snaplen,int promise,int to_ms)
 	printf("---------%s:%d---pd %p-\n",__func__,__LINE__,pd);
 	__set_nonblock(pd);
 #endif    
-	return   pd;     
+	return   pd;
+}
+#else
+pcap_t* open_pcap_file(const char* device,int snaplen,int promise,int to_ms)
+{
+    char ebuf[PCAP_ERRBUF_SIZE];
+    pcap_t* pd;
+    pd = open_interface(device,snaplen,1000,Bflag,ebuf);
+    if(NULL ==  pd)
+    {
+        printf("open_interface error %d error(%s)\n",errno,ebuf);
+    }
+    return pd;
+
 }
 
+
+
+
+#endif
 
 int sniffer_setfilter(pcap_t * pd,const char* bpf_str)
 {
