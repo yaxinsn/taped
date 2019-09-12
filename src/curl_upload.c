@@ -285,7 +285,7 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
 }
 #endif
 
-char server_ret_msg[2048]={0};
+//char server_ret_msg[2048]={0};
 
 int upload_mix_file(char* server_url,struct upload_file_info* file_info)
 {
@@ -330,11 +330,10 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost);
     curl_easy_setopt(curl ,CURLOPT_TIMEOUT,300);//300s
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,server_return_funtion);
-    
-    curl_easy_setopt(curl,CURLOPT_WRITEDATA,(void*)server_ret_msg);
-    res = curl_easy_perform(curl);  
 
+    curl_easy_setopt(curl,CURLOPT_WRITEDATA,(void*)file_info->server_ret_msg);
 
+    res = curl_easy_perform(curl);
     if (res != CURLE_OK)
     {
         log("curl  res: %d \n",res);
@@ -346,12 +345,25 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     /* then cleanup the formpost chain */
     curl_formfree((struct curl_httppost*)formpost);
 
-    log("server reg msg: file<%s> %s \n",file_info->file_name, server_ret_msg);
+    log("server reg msg: file<%s> %s \n",file_info->file_name, file_info->server_ret_msg);
 
-    if(strlen(server_ret_msg) != 0)
-        ret  = 0;
-    else
+    if(strlen(file_info->server_ret_msg) == 0)
+    {
         ret  = -1;
+    }
+    else
+    {
+        if ( strstr ( file_info->server_ret_msg, "false" ) == NULL)
+        {
+            ret = 0;
+        }
+        else
+        {
+            log("re-upload 2019-9-8 \n");
+            memset( file_info->server_ret_msg, 0, sizeof( file_info->server_ret_msg));
+            ret = -1;
+        }
+    }
     /* free slist */
     curl_slist_free_all (headerlist);
   }

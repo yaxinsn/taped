@@ -12,6 +12,7 @@ static int msg_engine_init(struct msg_engine_ctx* me)
 
   	wake_init(&me->wake);
 	TAILQ_INIT(&me->msg_head);
+	TAILQ_INIT(&me->msg_head2);
 	return 0;
 }
 
@@ -22,26 +23,36 @@ static int msg_engine_handler(struct msg_engine_ctx* _ctx )
 	_entry_st* entry_next = NULL;
 	int ret;
 
-	entry_head_t tmp_msg_head;
+	int retry = 0;
 
-	TAILQ_INIT(&tmp_msg_head);
+//	entry_head_t tmp_msg_head;
+
+//	TAILQ_INIT(&_ctx->msg_head2);
 	pthread_mutex_lock(&_ctx->mutex);
 	TAILQ_FOREACH_SAFE(entry,&_ctx->msg_head,node,entry_next)
 	{
     	TAILQ_REMOVE(&_ctx->msg_head,entry,node);
-    	TAILQ_INSERT_TAIL(&tmp_msg_head, entry, node);
+    	TAILQ_INSERT_TAIL(&_ctx->msg_head2, entry, node);
 	}
 	pthread_mutex_unlock(&_ctx->mutex);
 
-	TAILQ_FOREACH_SAFE(entry,&tmp_msg_head,node,entry_next)
+	TAILQ_FOREACH_SAFE(entry,&_ctx->msg_head2,node,entry_next)
 	{
-
 		ret = _ctx->cb_func(entry->msg,entry->len,_ctx);
 	    if(ret == 0)
 	    {
-	    	TAILQ_REMOVE(&tmp_msg_head,entry,node);
+	    	TAILQ_REMOVE(&_ctx->msg_head2,entry,node);
 		    free(entry);
 		}
+		else
+		{
+            retry = 1;
+		}
+	}
+	if(retry)
+	{
+	    sleep(1);
+	    wake_up(&_ctx->wake);
 	}
 
 	return 0;

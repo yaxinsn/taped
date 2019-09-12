@@ -51,6 +51,7 @@ typedef struct _entry
 	long 				stamp;
 	int 				type;
 	int 				len;
+	int                 re_count;
 	char				msg[0];
 }_entry_st;
 
@@ -60,11 +61,12 @@ struct msg_engine_ctx
 {
 	char name[32];
 	int msg_num;
-	pthread_mutex_t mutex;  //sync
 	_wake_ wake;
 	pthread_t tid;
-	
-	entry_head_t msg_head;
+
+	pthread_mutex_t mutex;  //sync
+	entry_head_t msg_head;  //input list header.
+	entry_head_t msg_head2; //handler list header.
 	msg_engine_handle cb_func;
 };
 

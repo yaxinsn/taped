@@ -264,7 +264,7 @@ pcap_t* open_pcap_file(const char* device,int snaplen,int promise,int to_ms)
 {
     char ebuf[PCAP_ERRBUF_SIZE];
     pcap_t* pd;
-    pd = open_interface(device,snaplen,1000,Bflag,ebuf);
+    pd = open_interface(device,snaplen,to_ms,Bflag,ebuf);
     if(NULL ==  pd)
     {
         printf("open_interface error %d error(%s)\n",errno,ebuf);

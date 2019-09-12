@@ -31,3 +31,7 @@
 5.0.13
 可以增加pcap的buffer_size. pcap_set_buffer_size 为20M。timeout为1000ms.
 
+
+5.0.16
+1 可以增加pcaptimeout为0ms.
+2 增加了重传机制。还是强制重传。每个文件只重传4次。由__upload_msg_handle来决定。
