@@ -535,7 +535,14 @@ int pase_sip_start_line(char* l,struct sip_pkt* sp)
 
 void _create_session(struct sip_pkt* spkt_p)
 {
-    struct session_info* ss = si_new_session();
+    struct session_info* ss = NULL;
+
+    if(spkt_p->msg_hdr.from_number == NULL)
+    {
+        sip_log_err("callid %s not calling number,so can't create the newsession \n",spkt_p->msg_hdr.call_id);
+        return;
+    }
+    ss = si_new_session();
     if(ss)
     {
     /*
@@ -555,7 +562,14 @@ void _create_session(struct sip_pkt* spkt_p)
         {
             ss->calling.ip.s_addr = spkt_p->rtp_ip.s_addr;
             ss->calling.port= spkt_p->rtp_port;
-            strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
+            if(spkt_p->msg_hdr.from_number != NULL)
+            {
+                strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
+            }
+            else
+            {
+                sip_log_err("callid %s not calling number!\n",ss->call_id);
+            }
         }
         sip_log("I create new session !!!!!!!!! callid %s \n",ss->call_id);
     }
@@ -794,6 +808,8 @@ void sync_session(struct sip_pkt* spkt_p)
     switch(spkt_p->state)
     {
         case SS_INVATE:
+            sip_log("will create a session callid address <%p> \n",spkt_p->msg_hdr.call_id);
+            sip_log("will create a session callid  <%s> \n",spkt_p->msg_hdr.call_id);
             create_session(spkt_p);
         break;
         case SS_ACK:
