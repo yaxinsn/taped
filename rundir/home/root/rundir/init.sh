@@ -14,7 +14,7 @@ echo "/home/root/core/core-%e-%p-%t" > /proc/sys/kernel/core_pattern
 echo "run it " >> /home/root/init.log
 /home/root/rundir/usr/sbin/taped &
 /home/root/rundir/sbin/start.sh &
-
+/home/root/rundir/usr/sbin/watchdog-taped.sh &
 if [ -e /etc/dropbear ];then
 	ls /etc/dropbear -lht >>$LOG_F
 
