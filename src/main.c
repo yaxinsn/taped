@@ -36,7 +36,7 @@ main.c
 #include "sniffer_rtp.h"
 #include "sniffer_skinny.h"
 
-#define VERSION "5.1.3"
+#define VERSION "5.1.9"
 extern pthread_t heart_start(void);
 
 int main_log(const char* s)
@@ -78,6 +78,7 @@ int init_ntpd()
     
     char* ntp_server = g_config.ntp.ntp_server;
     char cmd[1024]={0};
+    system("killall ntpd");
     sprintf(cmd,"ntpd -p %s",ntp_server);
     system(cmd);
     return 0;

@@ -64,7 +64,7 @@ typedef struct skinny_callReference_info
 
 
 	struct list_head node;
-    //char call_id[32]; 
+    char            str_call_id[32];
     u32 			call_id;
    // u32   callReference; //for skinny;
     /* 如何判断calling? 如何说INVATE的IP层srcIP == sdp.

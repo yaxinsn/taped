@@ -918,7 +918,7 @@ void handler_last_linear_list(struct rtp_session_info* n)
 
      linear_list_mix(n);
 #if 0
-     if(n->exit_flag ==2)
+     if(n->exit_flag == 2)
      {
 
      	n->mix_file_frag_info_caller = 0;//last frag
@@ -931,6 +931,8 @@ void handler_last_linear_list(struct rtp_session_info* n)
 #endif
      upload_the_mix_file(n);
 }
+
+///////////////////////////////////////////////////////////////////
 static int finish_rtp_in_signal(struct rtp_session_info* n);
 
 static int rtp_may_destory(struct rtp_session_info* n)
@@ -1327,7 +1329,7 @@ static void* sniffer_rtp_loop1(void* arg)
 
 	while(1)
 	{
-	    if(rs->exit_flag !=0)
+	    if(rs->exit_flag != 0)
 	    {
 	        log("I(%lu) get exit flag , so I call finish_rtp rtp_session_info's tid (%lu) \n",pthread_self(),rs->thread_id);
 	        finish_rtp(rs);
@@ -1384,9 +1386,14 @@ u32 setup_rtp_sniffer(struct session_info* ss)
     {
         log_err("this session is bad ession.!!!!");
     }
-
-	log("sniffer rtp info: \n");
-
+    if(ss->call_id)
+    {
+    	log("sniffer rtp info: callid <%s> \n",ss->call_id);
+    }
+    else
+    {
+    	log("sniffer rtp info: callid <NNAA> \n");
+    }
 	log("sniffer calling %s:%d phone_number %s \n",
 	    inet_ntoa(ss->calling.ip),ss->calling.port,ss->calling.number);
 	log("sniffer called  %s:%d phone_number %s \n",
@@ -1439,7 +1446,7 @@ u32 setup_rtp_sniffer(struct session_info* ss)
     rs->g722dst_called = (void*)g722_decode_init((g722_decode_state_t*) rs->g722dst_called, G722BITSRATE, 1 /* 表明采用8000采样 */);
     rs->g722dst_calling= (void*)g722_decode_init((g722_decode_state_t*) rs->g722dst_calling, G722BITSRATE, 1 /* 表明采用8000采样 */);
 
-    rs->session_id = ss->serial_no;
+    rs->session_id = ss->serial_no; //rs session_id表示的是服务器用于进行组文件的iD号。
 
 
  //   pthread_mutex_init(&rs->exit_flag_lock, NULL);

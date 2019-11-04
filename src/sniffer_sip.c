@@ -58,8 +58,13 @@ struct pcap_pkthdr
 
 
 */
-/****************************************** check and parse **************************************/
+/****************************************** function header **************************************/
 
+void _close_session(char* call_id);
+void _close_session_for_star98(char* call_id);
+
+
+/****************************************** check and parse **************************************/
 
 // SIP包内容标记
 #define SIPTAGANDVERSION1 "SIP/2.0"		// 回应, 在第一行开始位置
@@ -163,7 +168,7 @@ int parse_sdp_media_dest(char* p,struct sip_pkt* sp)
     char** media_ele;
     media_ele = parse_tokens(p,&count);
     if(media_ele != NULL && count >= 2){
-        sip_log("find the  port info from media of sdp : %s %s \n",media_ele[0],media_ele[1]);
+        sip_log("find the  port info from media of sdp : <%s> <%s> \n",media_ele[0],media_ele[1]);
         sp->rtp_port = atoi(media_ele[1]);
         if (strcmp(media_ele[0],"audio") != 0)
         {
@@ -395,6 +400,15 @@ int parse_msg_header(char* mh,struct sip_pkt* sp)
         {
             parse_sip_number(sp->msg_hdr.from,&sp->msg_hdr.from_number);
             sip_log("calling number: <%s> \n",sp->msg_hdr.from_number);
+                if(sp->msg_hdr.from_number)
+            {
+                if(sp->msg_hdr.from_number[0] == '*'
+                && sp->msg_hdr.from_number[1] == '9'
+                && sp->msg_hdr.from_number[2] == '8')
+                {
+                    sp->msg_hdr.is_star98 = STAR98_STEP_ONEBYONE;
+                }
+            }
         }
     }
 	if(sp->msg_hdr.to == NULL){
@@ -403,6 +417,15 @@ int parse_msg_header(char* mh,struct sip_pkt* sp)
         {
             parse_sip_number(sp->msg_hdr.to,&sp->msg_hdr.to_number);
             sip_log("called number: <%s> \n",sp->msg_hdr.to_number);
+            if(sp->msg_hdr.to_number)
+            {
+                if(sp->msg_hdr.to_number[0] == '*'
+                && sp->msg_hdr.to_number[1] == '9'
+                && sp->msg_hdr.to_number[2] == '8')
+                {
+                    sp->msg_hdr.is_star98 = STAR98_STEP_MEETING;
+                }
+            }
         }
 	}
 	if(sp->msg_hdr.date == NULL)
@@ -542,13 +565,19 @@ void _create_session(struct sip_pkt* spkt_p)
         sip_log_err("callid %s not calling number,so can't create the newsession \n",spkt_p->msg_hdr.call_id);
         return;
     }
+    if(spkt_p->msg_hdr.to_number == NULL)
+    {
+        sip_log_err("callid %s not called number,so can't create the newsession too !2019-10-15! \n",spkt_p->msg_hdr.call_id);
+        return;
+
+    }
     ss = si_new_session();
     if(ss)
     {
     /*
     如果是一个INVITE报文，报文中还有body(SDP)，则这个报文来自主叫。
     rtp_ip是主叫的 ip.
-    
+
     */
         if(spkt_p->state == SS_INVATE)
         {
@@ -556,7 +585,8 @@ void _create_session(struct sip_pkt* spkt_p)
                 ss->mode = SS_MODE_CALLING;
             else
                 ss->mode = SS_MODE_CALLED;
-        }   
+        }
+        ss->is_star98 = spkt_p->msg_hdr.is_star98;
         ss->call_id = strdup(spkt_p->msg_hdr.call_id);
         if(ss->mode == SS_MODE_CALLING)
         {
@@ -578,16 +608,53 @@ void _create_session(struct sip_pkt* spkt_p)
 		sip_log_err("ss is not created!\n");
 	}
 }
+
+void create_session_for_star98(struct sip_pkt* spkt_p)
+{
+    struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
+    if(!ss)
+    {
+       _create_session(spkt_p);
+    }
+    else
+    {
+        sip_log("INVATE this session (callid %s) is exist,close old ,create a new \n",spkt_p->msg_hdr.call_id);
+        sip_log("INVATE  old session address <%p> star98 step <%d> \n",ss,ss->is_star98);
+        u32 serial_no = ss->serial_no;
+
+        _close_session_for_star98(spkt_p->msg_hdr.call_id);
+        _create_session(spkt_p);
+         struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
+         if(ss)
+         {
+            sip_log("INVATE  new session address <%p> and set old serial_no %d star98 step <%d>\n",ss,ss->serial_no,ss->is_star98);
+            ss->serial_no = serial_no;
+         }
+         else
+         {
+            sip_log_err("INVATE  new session failed <%p> \n",ss);
+
+         }
+    }
+
+}
 void create_session(struct sip_pkt* spkt_p)
 {
-     struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
-     if(!ss)
-     {
-        _create_session(spkt_p);
-     }
-     else
-     {
-        sip_log("INVATE this session (callid %s) is exist\n",spkt_p->msg_hdr.call_id);
+    if(spkt_p->msg_hdr.is_star98 != 0)
+    {
+        create_session_for_star98(spkt_p);
+    }
+    else
+    {
+         struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
+         if(!ss)
+         {
+            _create_session(spkt_p);
+         }
+         else
+         {
+            sip_log("INVATE this session (callid %s) is exist\n",spkt_p->msg_hdr.call_id);
+         }
      }
 }
 
@@ -619,7 +686,18 @@ int __get_ok_pkt_cseq(struct sip_pkt* spkt_p)
     return cseq_key;
 }
 
+void sip_setup_rtp_sniffer(struct session_info* ss)
+{
+    sip_log("this sip session (%s)  setup rtp pthread\n",
+        ss->call_id);
+    sip_log("sniffer calling %s:%d phone_number %s \n",
+        inet_ntoa(ss->calling.ip),ss->calling.port,ss->calling.number);
+    sip_log("sniffer called  %s:%d phone_number %s \n",
+        inet_ntoa(ss->called.ip),ss->called.port,ss->called.number);
+    sip_log("Serial_No %d \n", ss->serial_no);
 
+    ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
+}
 void _update_session_for_ok(struct sip_pkt* spkt_p)
 {
     struct session_info* ss;
@@ -653,10 +731,12 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
                     }
                     else
 					{
-                    	strncpy(ss->called.number,
-                    		spkt_p->msg_hdr.to_number,
-                    		sizeof(ss->called.number));
-                    
+					    if(spkt_p->msg_hdr.to_number)
+					    {
+                        	strncpy(ss->called.number,
+                        		spkt_p->msg_hdr.to_number,
+                        		sizeof(ss->called.number));
+                        }
                     }
                     //strncpy(ss->called.number,spkt_p->msg_hdr.to_number,sizeof(ss->called.number));
                 }
@@ -679,16 +759,17 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
                     }
                     else
 					{
-                    	strncpy(ss->called.number,
-                    		spkt_p->msg_hdr.to_number,
-                    		sizeof(ss->called.number));
-
+					    if(spkt_p->msg_hdr.to_number)
+					    {
+                    	    strncpy(ss->called.number,
+                    		    spkt_p->msg_hdr.to_number,
+                    		    sizeof(ss->called.number));
+                        }
                     }
-					if(ss->rtp_sniffer_id == 0){
+					if(ss->rtp_sniffer_id == 0)
+					{
 
-                        sip_log("this sip session (%s) 's rtp not exist, setup rtp pthread\n",
-                                ss->call_id);
-                        ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
+                        sip_setup_rtp_sniffer(ss);
                     }
                     else
                     {
@@ -699,11 +780,12 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
             }
             else
             {
-                sip_log_err("session (callid %s)  not update any info!\n",spkt_p->msg_hdr.call_id);
-                
+                sip_log_err("session (callid %s) not update any info!\n",spkt_p->msg_hdr.call_id);
+                sip_log_err("this pkt want update called <ip port> IP: %s:%d \n\n",inet_ntoa(spkt_p->rtp_ip),spkt_p->rtp_port);
+
             }
-            
-            
+
+
         }
         else
         {
@@ -712,18 +794,29 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
         }
     }
 }
+/*
+*98并席的过程，
+1.1 是 电话是主叫，CUCM是被叫。 （两个IP的port号相同） 本机电话YYYY call *98XXX.
+1.2 是  CUCM是主叫，电话是被叫    （两个IP的PORT号不同，开始真正的通话）
 
-void _update_session(struct sip_pkt* spkt_p)
+
+2.0 由于其中一人挂机，并席的三方通话完成变成两方通话。
+    CUCM发起新的通话，从*98XXX call 本机电话YYYY的。
+
+同一个session(callid 相同)，主被叫发生变化。
+
+*/
+void _update_session_for_ack(struct sip_pkt* spkt_p)
 {
     struct session_info* ss;
     if(spkt_p->msg_hdr.call_id)
     {
-       
+
         ss = si_find_session(spkt_p->msg_hdr.call_id);
-       
+
         if(ss != NULL)
         {
-        
+
             sip_log("I find the session (callid %s) \n",ss->call_id);
             if (ss->mode == SS_MODE_CALLED && spkt_p->state == SS_ACK)
             {
@@ -733,17 +826,14 @@ void _update_session(struct sip_pkt* spkt_p)
                 {
                     ss->calling.ip.s_addr = spkt_p->rtp_ip.s_addr;
                     ss->calling.port = spkt_p->rtp_port;
-                   
-                    
+
                     strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
                     sip_log("I find the session (callid %s) calling number: %s \n",
                             ss->call_id,ss->calling.number);
 
                      if(ss->rtp_sniffer_id == 0)
                      {
-                        sip_log("this sip session (%s) 's rtp not exist, setup rtp pthread\n",
-                                ss->call_id);
-                        ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
+                        sip_setup_rtp_sniffer(ss);
                     }
                     else
                     {
@@ -752,46 +842,47 @@ void _update_session(struct sip_pkt* spkt_p)
                     }
                 }
                 else
-                {     
+                {
                     sip_log("I find the session (callid %s) no body \n",
                         ss->call_id);
-      
+
                 }
             }
-         
             else
             {
+            //专门为SIP的并席而增加了相关的处理：2019.10.21
+
                 sip_log_err("session (callid %s)  not update any info!\n",spkt_p->msg_hdr.call_id);
-                
+                sip_log_err("this pkt want update calling<ip port> IP: %s:%d \n\n",inet_ntoa(spkt_p->rtp_ip),spkt_p->rtp_port);
+
             }
-            
-            
+
+
         }
         else
         {
-            
+
             sip_log_err("I not find the session (callid %s) \n",spkt_p->msg_hdr.call_id);
         }
     }
 }
-
-
-void _close_session(struct sip_pkt* spkt_p)
+void _close_session_for_star98(char* call_id)
 {
     struct session_info* ss;
-    if(spkt_p->msg_hdr.call_id)
+    if(call_id)
     {
-        ss = si_find_session(spkt_p->msg_hdr.call_id);
+        ss = si_find_session(call_id);
         if(ss != NULL)
         {
-            sip_log("I find the session (callid %s),and close it. \n",ss->call_id);
+            sip_log("I find the session (callid %s),and close it. \n",call_id);
  //           ss->state = spkt_p->state;
 
-            close_dial_session_sniffer_lastone(ss->rtp_sniffer_id);
+            close_dial_session_sniffer(ss->rtp_sniffer_id);
+
         }
         else
         {
-            sip_log_err("not find the session (callid %s) \n",spkt_p->msg_hdr.call_id);
+            sip_log_err("not find the session (callid %s) \n",call_id);
             return;
         }
         si_del_session(ss);
@@ -802,6 +893,36 @@ void _close_session(struct sip_pkt* spkt_p)
     }
 
 }
+
+void _close_session(char* call_id)
+{
+    struct session_info* ss;
+    if(call_id)
+    {
+        ss = si_find_session(call_id);
+        if(ss != NULL)
+        {
+            sip_log("I find the session (callid %s),and close it. \n",call_id);
+ //           ss->state = spkt_p->state;
+
+
+                    close_dial_session_sniffer_lastone(ss->rtp_sniffer_id);
+
+        }
+        else
+        {
+            sip_log_err("not find the session (callid %s) \n",call_id);
+            return;
+        }
+        si_del_session(ss);
+    }
+    else
+    {
+        sip_log_err(" this spkt not callid ,so bad \n");
+    }
+
+}
+
 void sync_session(struct sip_pkt* spkt_p)
 {
     sip_log("pkt state %d \n",spkt_p->state);
@@ -813,13 +934,13 @@ void sync_session(struct sip_pkt* spkt_p)
             create_session(spkt_p);
         break;
         case SS_ACK:
-        _update_session(spkt_p);
+        _update_session_for_ack(spkt_p);
         break;
         case SS_OK:
         _update_session_for_ok(spkt_p);
         break;
         case SS_BYE:
-        _close_session(spkt_p);
+        _close_session(spkt_p->msg_hdr.call_id);
         break;
         case SS_ERROR:
         case SS_TRYING:

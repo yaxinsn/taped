@@ -29,7 +29,7 @@
 #include "g722.h"
 #include "mixer.h"
 #define RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG 3
-#define RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD 2
+#define RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD 2  //结束此线程时，最后一个上传文件的信息中不要设置 last pack flag. 2019-11-04.
 #define RTP_EXIT_STOP_SNIFFER_NOT_EXIT_PTHREAD 1 //stop
 struct linear_mix_list_st
 {
@@ -114,7 +114,7 @@ struct rtp_session_info
 
      int mix_file_frag_count;
     // int mix_file_frag_info_caller;  //   0 is user hung up. the rtp is stop;   1 is session_talking_2
-     int session_id;
+     int session_id; // session_id表示的是服务器用于进行组文件的iD号。
  //    pthread_mutex_t exit_flag_lock;
      int exit_flag;
 	 char called_group_number[64];
@@ -127,13 +127,13 @@ struct rtp_session_info
 
 u32 setup_rtp_sniffer(struct session_info* ss);
 /*
-��������ͨ���ĻỰ�������û��һ�ʱ�Ĵ�����
-����RTPͨ�ŵĽ�����
+结束整个通话的会话。就是用户挂机时的处理。
+不是RTP通信的结束。
 */
 void close_dial_session_sniffer(unsigned long rtp_sniffer_tid);
 void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid);
 /*
-��һ��rtpͨ�š�
+结一个rtp通信。
 */
 void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid);
 

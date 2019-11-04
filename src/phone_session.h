@@ -77,6 +77,7 @@ struct session_info //与信令协议 sip ,skinny无关。是更高一级的应�
     char    called_group_number[64];
     u32 rtp_sniffer_id;
     u32 serial_no;
+    int is_star98;
 
 }; /* 用于记录本次通信的两者的ip, port, 电话号码，用户名等等。*/
 

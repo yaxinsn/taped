@@ -664,7 +664,7 @@ void __start_media_rtp_sniffer(skinny_media_info* sm,
     sm->session_comm_info.serial_no = sm->pfather->skinny_serial_no;
     if(0 == sm->session_comm_info.rtp_sniffer_id)
     {
-
+            sm->session_comm_info.call_id = sm->pfather->str_call_id;
         sm->session_comm_info.rtp_sniffer_id = setup_rtp_sniffer(&sm->session_comm_info);
         skinny_log("_-_-_----- passThruPartyID (%u)'s rtp_sniffer_tid %u\n",
         sm->passThruPartyID, sm->session_comm_info.rtp_sniffer_id);
@@ -1092,7 +1092,7 @@ void handle_CallState(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
         if(skinny_callRefer_info ==NULL)
             return;
    		skinny_callRefer_info->call_id = callReference;
-
+        sprintf(skinny_callRefer_info->str_call_id,"%u",callReference);
         skinny_log("skinny_new_session callid %u skinny_serial_no %u\n",callReference,skinny_callRefer_info->skinny_serial_no);
     }
 
@@ -1407,6 +1407,7 @@ void handle_DialedNumber(skinny_opcode_map_t* skinny_op, u8* msg,u32 len,
 
         skinny_callRefer_info->call_id = callReference;
 
+        sprintf(skinny_callRefer_info->str_call_id,"%u",callReference);
     }
 
     skinny_log("skinny_new_session callid %u skinny_serial_no %u\n",callReference,skinny_callRefer_info->skinny_serial_no);

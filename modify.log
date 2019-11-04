@@ -35,3 +35,13 @@
 5.0.16
 1 可以增加pcaptimeout为0ms.
 2 增加了重传机制。还是强制重传。每个文件只重传4次。由__upload_msg_handle来决定。
+
+
+5.1.5
+1 增加了watchdog-taped.sh
+
+5.1.9
+1 SIP中并席过程中有一个call_id有三次invate开始的过程，每一次都会更新IP和port. 但是call_id不变。这样可以一直使用call_id来管理sip session。在create_session_for_star98中，每来一次invate时，则关闭了sip和rtp的session.再打开一个新的sipsession，再生成一个新的RTP session. 新的SIP session中的serial_no不变，这样则乔的service可以把它们全组成一个录音。
+2 把 _close_session(char* call_id)的参数改成call_id.
+3,_close_session_for_star98 它专门被create_session_for_star98 调用，这样并席中间过程的rtp会话，使用close_dial_session_sniffer，只关闭rtp会话，但在上传时，不加last pack flag的标志。
+

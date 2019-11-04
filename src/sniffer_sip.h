@@ -11,6 +11,12 @@
 
 
 
+enum STAR98_STEP
+{
+
+    STAR98_STEP_MEETING = 1,
+    STAR98_STEP_ONEBYONE = 2,
+};
 
 struct sip_msg_header
 {
@@ -33,6 +39,7 @@ struct sip_msg_header
 	
 	char* remote_party_id;
 	char* remote_party_id_phone_number;
+	int  is_star98; //是不是*98 这是并席的开始。对这一类进行特别的处理。
 };
 enum sip_session_state
 {
