@@ -8,7 +8,7 @@ STAGING_DIR=../staging_dir/staging_dir
 TOOLCHAIN_DIR=/opt/gcc-linaro-arm-linux-gnueabihf-4.7-2013.03-20130313_linux/arm-linux-gnueabihf/libc/
 progam_src =   main.c  sniffer_sip.c upload.c heart.c config.c sniffer_rtp.c phone_session.c sniffer_skinny.c curl_upload.c
 progam_obj =  $(progam_src:.c=.o)
-lib_src =  linux-utils.c  log.c  sniffer_lib.c  thread_msg_engine.c  wake_utils.c json.c str_lib.c 
+lib_src =  linux-utils.c  log.c  sniffer_lib.c  thread_msg_engine.c  wake_utils.c json.c str_lib.c time.c
 voice_lib_src = g722_encode.c g722_decode.c mixer.c ulaw.c ulaw_codec.c
 voice_lib_src+=alaw.c alaw_codec.c
  

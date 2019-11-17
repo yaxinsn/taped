@@ -603,12 +603,9 @@ static  int linear_buf_save_to_list(
     }
     if( (list_st->_pkt_count % MIX_BUF_COUNT) == 0)
     {
+        list_st->_mix_list = list_st->linear_buf_list;
 
-        list_st->_mix_list=
-            list_st->linear_buf_list;
-
-        if(list_st->linear_buf_list ==
-            &list_st->_list_a)
+        if(list_st->linear_buf_list == &list_st->_list_a)
             list_st->linear_buf_list = &list_st->_list_b;
         else
             list_st->linear_buf_list = &list_st->_list_a;
@@ -782,6 +779,7 @@ int cul_rtp_end_time(struct rtp_session_info* n)
 
     time_t a;
     struct tm tt;
+    get_time_stamp(&n->stop_time_stamp);
     a = mktime(&n->ring_time);
 
     duration = n->stop_time_stamp - n->start_time_stamp;
@@ -807,9 +805,15 @@ int upload_the_mix_file(struct rtp_session_info* n)
     struct upload_file_info ufi;
     char time_str[256]={0};
     struct config_st* c = &g_config;
-//    char ring_time[256]={0};
-
-
+    time_t end;
+    time_t call_duration = 0;
+//得到本次fragement的时长。更新下一个fragement的开始时长。
+{
+    get_time_stamp(&end);
+    call_duration = end - n->each_fragment_start_time_stamp;
+    n->each_fragment_start_time_stamp = end;
+    ufi.duration = call_duration;
+}
     strncpy(ufi.call_caller_number,n->calling.number,sizeof(ufi.call_caller_number));
 
     strncpy(ufi.call_callee_number,n->called.number,sizeof(ufi.call_callee_number));
@@ -917,18 +921,7 @@ void handler_last_linear_list(struct rtp_session_info* n)
         n->called_mix_list_st.linear_buf_list;
 
      linear_list_mix(n);
-#if 0
-     if(n->exit_flag == 2)
-     {
 
-     	n->mix_file_frag_info_caller = 0;//last frag
-     }
-     else
-     {
-
-     	n->mix_file_frag_info_caller = 1;//not last frag
-     }
-#endif
      upload_the_mix_file(n);
 }
 
@@ -987,7 +980,7 @@ static int finish_rtp_in_signal(struct rtp_session_info* n)
     int retval=3;
 
     log("I(%lu)  enter finish_rtp_in_signal \n",pthread_self());
-    time(&n->stop_time_stamp);
+
     cul_rtp_end_time(n);
 
     handler_last_linear_list(n);
@@ -1431,7 +1424,8 @@ u32 setup_rtp_sniffer(struct session_info* ss)
 
     memcpy(&rs->ring_time,&t,sizeof(struct tm));
 }
-    rs->start_time_stamp = a;
+    get_time_stamp(&rs->start_time_stamp);
+    get_time_stamp(&rs->each_fragment_start_time_stamp);
     rs->call_dir = ss->mode;
     memcpy(&rs->called,&ss->called,sizeof(ss->called));
     memcpy(&rs->calling,&ss->calling,sizeof(ss->calling));

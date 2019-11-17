@@ -45,3 +45,7 @@
 2 把 _close_session(char* call_id)的参数改成call_id.
 3,_close_session_for_star98 它专门被create_session_for_star98 调用，这样并席中间过程的rtp会话，使用close_dial_session_sniffer，只关闭rtp会话，但在上传时，不加last pack flag的标志。
 
+
+5.1.10
+增加time.c 用于取得时间间隔。
+增加每一个报文的时间长。

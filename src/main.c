@@ -36,7 +36,7 @@ main.c
 #include "sniffer_rtp.h"
 #include "sniffer_skinny.h"
 
-#define VERSION "5.1.9"
+#define VERSION "5.1.10"
 extern pthread_t heart_start(void);
 
 int main_log(const char* s)

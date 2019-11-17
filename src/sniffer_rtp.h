@@ -70,6 +70,7 @@ struct rtp_session_info
     u8     rtp_type;
 
     time_t start_time_stamp;
+    time_t each_fragment_start_time_stamp;
 
     time_t stop_time_stamp;
     //struct session_info* session;

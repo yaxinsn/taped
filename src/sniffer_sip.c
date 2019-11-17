@@ -33,6 +33,7 @@
 
 #include "sniffer_rtp.h"
 
+const static char* str_star98 = "*98";
 extern struct config_st g_config;
 
 FILE* sip_log_fp = NULL;
@@ -63,6 +64,40 @@ struct pcap_pkthdr
 void _close_session(char* call_id);
 void _close_session_for_star98(char* call_id);
 
+char* str_sip_type[]=
+{
+    "NULL",
+"request",
+"response",
+};
+
+static char* sip_type_to_str(int type)
+{
+    if(type < sizeof(str_sip_type)/sizeof(str_sip_type[0]))
+    {
+        return str_sip_type[type];
+    }
+    return "NA";
+}
+char* str_sip_state[]=
+{
+    "ERROR",
+    "INVATE",
+    "TRYING",
+    "RINGING",
+    "OK",
+    "ACK",
+    "BYE",
+};
+
+static char* sip_state_to_str(enum sip_session_state state)
+{
+    if(state < sizeof(str_sip_state)/sizeof(str_sip_state[0]))
+    {
+        return str_sip_state[state];
+    }
+    return "NA";
+}
 
 /****************************************** check and parse **************************************/
 
@@ -232,7 +267,10 @@ int parse_msg_body_sdp_media_connect(struct sip_pkt* sp)
     int ret;
     int offset;
     int flag = 0;
-    
+
+    sip_log("\n SDP enter type %d state %d \n",sp->type,sp->state);
+
+        sip_log("\n SDP enter type %s state %s \n",sip_type_to_str(sp->type),sip_state_to_str(sp->state));
 	//printf("%s:%d \n",__func__,__LINE__);
     origin_media_line = __parse_msg_heade_body_str_element(b,"m=",&media_line);
 	//printf("%s:%d \n",__func__,__LINE__);
@@ -402,9 +440,7 @@ int parse_msg_header(char* mh,struct sip_pkt* sp)
             sip_log("calling number: <%s> \n",sp->msg_hdr.from_number);
                 if(sp->msg_hdr.from_number)
             {
-                if(sp->msg_hdr.from_number[0] == '*'
-                && sp->msg_hdr.from_number[1] == '9'
-                && sp->msg_hdr.from_number[2] == '8')
+                if(!strncmp(str_star98,sp->msg_hdr.from_number,strlen(str_star98)-1 ))
                 {
                     sp->msg_hdr.is_star98 = STAR98_STEP_ONEBYONE;
                 }
@@ -419,9 +455,7 @@ int parse_msg_header(char* mh,struct sip_pkt* sp)
             sip_log("called number: <%s> \n",sp->msg_hdr.to_number);
             if(sp->msg_hdr.to_number)
             {
-                if(sp->msg_hdr.to_number[0] == '*'
-                && sp->msg_hdr.to_number[1] == '9'
-                && sp->msg_hdr.to_number[2] == '8')
+                if (!strncmp (str_star98,sp->msg_hdr.to_number,strlen(str_star98)-1 ))
                 {
                     sp->msg_hdr.is_star98 = STAR98_STEP_MEETING;
                 }

@@ -144,6 +144,18 @@ int set_up_formpost(struct curl_httppost** formpost,struct curl_httppost** lastp
     {
         return -1;
     }
+    char str_duration[40] = {0};
+    sprintf(str_duration,"%u",info->duration);
+    ret =  curl_formadd((struct curl_httppost**)formpost,
+       (struct curl_httppost**)lastptr,
+       CURLFORM_COPYNAME, "CALL_DURATION",
+       CURLFORM_COPYCONTENTS,str_duration,
+       CURLFORM_END);
+
+    if(ret != CURL_FORMADD_OK)
+    {
+        return -1;
+    }
 
       ret = curl_formadd((struct curl_httppost**)formpost,
                (struct curl_httppost**)lastptr,
