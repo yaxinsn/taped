@@ -143,5 +143,8 @@ void rtp_sniffer_init(void);
 struct rtp_session_info* rtp_find_session(void);
 struct rtp_session_info* rtp_find_session_by_my_pthead_id(u32   my_thread_id);
 
+
+int rtp_sniffer_stop(struct rtp_session_info* rs);
+
 #endif //SNIFFER_RTP_H_
 

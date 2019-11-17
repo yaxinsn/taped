@@ -989,7 +989,7 @@ static int finish_rtp_in_signal(struct rtp_session_info* n)
 
     return 0;
 }
-
+#if 0
 static void sighandler(int s)
 {
     int retval = 3;
@@ -1033,7 +1033,7 @@ static void sighandler(int s)
     }
 #endif
 }
-
+#endif
 #if 0
 static void sighandler(int s)
 {
@@ -1098,6 +1098,7 @@ static void sighandler(int s)
 
 }
 #endif
+#if 0
 static int thread_kill(u32 my_thread_id)
 {
 
@@ -1173,13 +1174,10 @@ kill:
 
     return 0;
 }
-
+#endif
 void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 {
 
-	//session_down();
-
-	//time(&ss->stop_time_stamp);
     struct rtp_session_info* n;
 	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
 	if(rtp_my_pthread_id)
@@ -1194,22 +1192,20 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 1( only close only one rtp ) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_NOT_EXIT_PTHREAD;
+            rtp_sniffer_stop(n);
 
 		}
 #endif
 
-		thread_kill(rtp_my_pthread_id);
+		//thread_kill(rtp_my_pthread_id);
 	}
 }
 
 void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
 {
-
-	//session_down();
     sleep(1);//2019-8-23,报文来得太快，上一次的handle_StopMediaTransmission时的rtp
         // 线程未完全处理完。
 
-	//time(&ss->stop_time_stamp);
 	struct rtp_session_info* n;
 
 	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
@@ -1225,19 +1221,17 @@ void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 3(all dial session close) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG;
+            rtp_sniffer_stop(n);
 
 		}
 #endif
 
-		thread_kill(rtp_my_pthread_id);
+		//thread_kill(rtp_my_pthread_id);
 	}
 }
 void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 {
 
-	//session_down();
-
-	//time(&ss->stop_time_stamp);
 	struct rtp_session_info* n;
 	unsigned long rtp_my_pthread_id = rtp_sniffer_tid;
 	if(rtp_my_pthread_id)
@@ -1252,11 +1246,11 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 2 (all dial session close) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD;
-
+            rtp_sniffer_stop(n);
 		}
 #endif
 
-		thread_kill(rtp_my_pthread_id);
+		//thread_kill(rtp_my_pthread_id);
 	}
 }
 
@@ -1338,7 +1332,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
 	char callingip_str[32] = {0};
 	char calledip_str[32] = {0};
     pcap_t* pd=0;
-    signal(SIGQUIT, sighandler);
+ //   signal(SIGQUIT, sighandler);
 	//pd = open_pcap_file("enp0s3",65535,1,0);
 	pd = open_pcap_file("eth0",65535,1,0);
 	if(pd == NULL)
@@ -1446,21 +1440,26 @@ u32 setup_rtp_sniffer(struct session_info* ss)
  //   pthread_mutex_init(&rs->exit_flag_lock, NULL);
    // pthread_mutex_init(&rs->kill_signal_lock, NULL);
 
-    sem_init(&rs->_kill_signal_event, 0, 0);
-    sem_post(&rs->_kill_signal_event);
+//    sem_init(&rs->_kill_signal_event, 0, 0);
+//    sem_post(&rs->_kill_signal_event);
 
 	//session_up();
 
-	if(pthread_create(&tid,NULL,sniffer_rtp_loop1,rs))
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+	if(pthread_create(&tid,&attr,sniffer_rtp_loop1,rs))
 	{
 		log("create msg_engine_start sniffer_sip_loop failed\n");
 		return -1;
 	}
+    pthread_attr_destroy(&attr);
 	rs->thread_id = tid;
 
 	log("rs thread_id %lu my_thread_id %lu\n",rs->thread_id,rs->my_thread_id);
 
-    pthread_detach(tid);//线程与sip线程分离。
+    //pthread_detach(tid);//线程与sip线程分离。
 
 	return rs->my_thread_id;
 
@@ -1474,4 +1473,13 @@ void rtp_sniffer_init(void)
     ulawcodec_init();
     ast_alaw_init();
 
+}
+
+int rtp_sniffer_stop(struct rtp_session_info* rs)
+{
+    if(rs->pd)
+    {
+        pcap_breakloop(rs->pd);
+    }
+    return 0;
 }

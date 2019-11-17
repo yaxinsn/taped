@@ -157,11 +157,11 @@ int set_up_formpost(struct curl_httppost** formpost,struct curl_httppost** lastp
         return -1;
     }
 
-      ret = curl_formadd((struct curl_httppost**)formpost,
-               (struct curl_httppost**)lastptr,
-               CURLFORM_COPYNAME, "FRAG_FLAG",
-               CURLFORM_COPYCONTENTS, info->frag_flag,
-               CURLFORM_END);
+    ret = curl_formadd((struct curl_httppost**)formpost,
+           (struct curl_httppost**)lastptr,
+           CURLFORM_COPYNAME, "FRAG_FLAG",
+           CURLFORM_COPYCONTENTS, info->frag_flag,
+           CURLFORM_END);
 
     if(ret != CURL_FORMADD_OK)
     {
@@ -230,7 +230,7 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
     curl_easy_setopt(curl, CURLOPT_HTTPPOST, formpost);
     curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,server_return_funtion);
-    
+
     curl_easy_setopt(curl,CURLOPT_WRITEDATA,server_ret_msg);
 
     curl_multi_add_handle(multi_handle, curl);
@@ -238,7 +238,7 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
     while(CURLM_CALL_MULTI_PERFORM ==
           curl_multi_perform(multi_handle, &still_running));
 
-    while(still_running) 
+    while(still_running)
     {
       struct timeval timeout;
       int rc; /* select() return code */
@@ -312,7 +312,7 @@ int upload_mix_file(char* server_url,struct upload_file_info* file_info)
   struct curl_slist *headerlist=NULL;
   char buf[] = "Expect:";
   int ret = 0;
-  CURLcode res = CURLE_OK; 
+  CURLcode res = CURLE_OK;
 
   ret = set_up_formpost((struct curl_httppost**)&formpost,(struct curl_httppost**)&lastptr,file_info);
   if(ret != 0)

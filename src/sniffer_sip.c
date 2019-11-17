@@ -823,7 +823,6 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
         }
         else
         {
-            
             sip_log_err("I not find the session (callid %s) \n",spkt_p->msg_hdr.call_id);
         }
     }

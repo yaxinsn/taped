@@ -28,6 +28,8 @@
 #include <stdarg.h>
 #include <time.h>
 
+#include <sys/syscall.h>
+
 #include "log.h"
 
 
@@ -113,7 +115,7 @@ void _logger_file2(FILE* log_fp,const char* file_name, const char* func, int lin
 	
     fprintf(log_fp,"%-20s",buf_time);
 
-    fprintf(log_fp," |%-20s|%-5d| ",func,line);
+    fprintf(log_fp," pid-%lu|%-20s|%-5d| ",syscall(SYS_gettid),func,line);
     va_start(args,fmt);
     vfprintf(log_fp,fmt,args);
     va_end(args);

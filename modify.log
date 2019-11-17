@@ -49,3 +49,20 @@
 5.1.10
 增加time.c 用于取得时间间隔。
 增加每一个报文的时间长。
+
+
+5.1.11
+1.不再使用pthread_kill机制。
+2.子线程自己detached.    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+3. log里打印出自己的PID。
+但是由于pcap 线程没停下来，所以录音没成功。
+
+
+
+5.1.12 
+解决了5.1.11的BUG 
+	增加了pcap_stop 函数，让rtp session中的 pcap _while可以停下来。
+问题是，从停下来到线程结束 需要10到20S的时间，导致上报的时间不准。
+日志里增加pid-XXX.
+
+
