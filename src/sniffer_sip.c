@@ -1186,7 +1186,7 @@ void* sniffer_sip_loop(void* arg)
     pcap_t* pd=0;
     #if 1
 	//pd = open_pcap_file("enp0s3",65535,1,0);
-	pd = open_pcap_file("eth0",65535,1,0);
+	pd = open_pcap_file("eth0",65535,100,0);
 	if(pd == NULL)
 	{
 

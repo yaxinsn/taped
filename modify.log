@@ -66,3 +66,9 @@
 日志里增加pid-XXX.
 
 
+
+5.1.13
+open_pcap_file（）to_ms =100 也就 是0.1S
+把ring_time的计算提前了。
+
+
