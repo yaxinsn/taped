@@ -655,18 +655,25 @@ void create_session_for_star98(struct sip_pkt* spkt_p)
         sip_log("INVATE this session (callid %s) is exist,close old ,create a new \n",spkt_p->msg_hdr.call_id);
         sip_log("INVATE  old session address <%p> star98 step <%d> \n",ss,ss->is_star98);
         u32 serial_no = ss->serial_no;
+        char called_number[64];
+        char calling_number[64];
+
+        strncpy(called_number,ss->called.number,sizeof(called_number));
+        strncpy(calling_number,ss->calling.number,sizeof(calling_number));
 
         _close_session_for_star98(spkt_p->msg_hdr.call_id);
         _create_session(spkt_p);
-         struct session_info* ss = si_find_session(spkt_p->msg_hdr.call_id);
-         if(ss)
+         struct session_info* new_ss = si_find_session(spkt_p->msg_hdr.call_id);
+         if(new_ss)
          {
-            sip_log("INVATE  new session address <%p> and set old serial_no %d star98 step <%d>\n",ss,ss->serial_no,ss->is_star98);
-            ss->serial_no = serial_no;
+            sip_log("INVATE  new session address <%p> and set old serial_no %d star98 step <%d>\n",new_ss,new_ss->serial_no,new_ss->is_star98);
+            new_ss->serial_no = serial_no;
+            strncpy(new_ss->called.number,called_number,sizeof(new_ss->called.number));
+            strncpy(new_ss->calling.number,calling_number,sizeof(new_ss->calling.number));
          }
          else
          {
-            sip_log_err("INVATE  new session failed <%p> \n",ss);
+            sip_log_err("INVATE  new session failed <%p> \n",new_ss);
 
          }
     }
@@ -722,6 +729,21 @@ int __get_ok_pkt_cseq(struct sip_pkt* spkt_p)
 
 void sip_setup_rtp_sniffer(struct session_info* ss)
 {
+    {
+        /* 如果源IP地址为0，则RTP没有办法区分录音报文是来自哪一方，更不能进行混音。 */
+        if (ss->calling.ip.s_addr == 0)
+        {
+            sip_log_err("session (callid %s)'s calling ip=0,so byebye. \n",ss->call_id);
+            return;
+        }
+
+        if (ss->called.ip.s_addr == 0)
+        {
+            sip_log_err("session (callid %s)'s called ip=0,so byebye. \n",ss->call_id);
+            return;
+        }
+
+    }
     sip_log("this sip session (%s)  setup rtp pthread\n",
         ss->call_id);
     sip_log("sniffer calling %s:%d phone_number %s \n",
@@ -746,8 +768,9 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
        
         if(ss != NULL)
         {
-        
+
             sip_log("I find the session (callid %s) \n",ss->call_id);
+
             if (ss->mode == SS_MODE_CALLED)
             {
                 if(spkt_p->body_sdp)

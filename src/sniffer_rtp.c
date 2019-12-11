@@ -981,7 +981,6 @@ static int finish_rtp_in_signal(struct rtp_session_info* n)
 
     log("I(%lu)  enter finish_rtp_in_signal \n",pthread_self());
 
-    cul_rtp_end_time(n);
 
     handler_last_linear_list(n);
 
@@ -1192,6 +1191,7 @@ void close_one_rtp_sniffer(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 1( only close only one rtp ) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_NOT_EXIT_PTHREAD;
+            cul_rtp_end_time(n);
             rtp_sniffer_stop(n);
 
 		}
@@ -1221,6 +1221,7 @@ void close_dial_session_sniffer_lastone(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 3(all dial session close) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD_SET_LAST_PACK_FLAG;
+            cul_rtp_end_time(n);
             rtp_sniffer_stop(n);
 
 		}
@@ -1246,6 +1247,7 @@ void close_dial_session_sniffer(unsigned long rtp_sniffer_tid)
 
 			log("set rtp sniffer's exit_flag to 2 (all dial session close) \n");
 			n->exit_flag = RTP_EXIT_STOP_SNIFFER_EXIT_PTHREAD;
+            cul_rtp_end_time(n);
             rtp_sniffer_stop(n);
 		}
 #endif
@@ -1334,7 +1336,7 @@ static pcap_t* init_sniffer_rtp(struct session_info* ss)
     pcap_t* pd=0;
  //   signal(SIGQUIT, sighandler);
 	//pd = open_pcap_file("enp0s3",65535,1,0);
-	pd = open_pcap_file("eth0",65535,1,0);
+	pd = open_pcap_file("eth0",65535,100,0);
 	if(pd == NULL)
 	{
 		log("open_pcap_file failed ! \n");
