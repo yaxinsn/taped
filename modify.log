@@ -77,6 +77,12 @@ open_pcap_file（）to_ms =100 也就 是0.1S
 2.*98时，生成新的RTP时 要把源电话与目的电话也COPY过去。
 
 5.1.15
-修改上一个版本　SIP不录音的严重BUG,这是1.14修改出来的。
+修改上一个版本　SIP不录音的严重BUG,这是1.14修改出来的。 把 ip地址 == 0放到sip_setup_rtp_sniffer
+
+5.1.16
+change_phone_number_for_ok 和 change_phone_number_for_ack，当有*98的时候，不进行更新电话号码。
+for_ok里不应该有 ERROR-ERROR! I am s called, why receive a OK pkt!
+
+
 
 

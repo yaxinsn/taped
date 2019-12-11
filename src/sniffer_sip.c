@@ -754,6 +754,38 @@ void sip_setup_rtp_sniffer(struct session_info* ss)
 
     ss->rtp_sniffer_id = setup_rtp_sniffer(ss);
 }
+void change_phone_number_for_ok(struct sip_pkt* spkt_p,  struct session_info* ss)
+{
+    if(ss->is_star98)
+    {
+        sip_log("I am star98 ,I can't change called-number  <%s> \n",ss->called.number);
+        return;
+    }
+    if(spkt_p->msg_hdr.remote_party_id_phone_number)
+    {
+    /* 把原来的called number放到called_group_number里，这是被叫的组号。 */
+
+        sip_log("called_group_number  <%s> to <%s> \n",ss->called_group_number,ss->called.number);
+        strncpy(ss->called_group_number,ss->called.number,
+            sizeof(ss->called_group_number));
+
+        sip_log("called nubmer <%s> to <%s> \n",ss->called.number,spkt_p->msg_hdr.remote_party_id_phone_number);
+        strncpy(ss->called.number,
+            spkt_p->msg_hdr.remote_party_id_phone_number,
+            sizeof(ss->called.number));
+    }
+    else
+    {
+        if(spkt_p->msg_hdr.to_number)
+        {
+            sip_log("called nubmer <%s> to <%s> \n",ss->called.number,spkt_p->msg_hdr.to_number);
+            strncpy(ss->called.number,
+                spkt_p->msg_hdr.to_number,
+                sizeof(ss->called.number));
+        }
+    }
+
+}
 void _update_session_for_ok(struct sip_pkt* spkt_p)
 {
     struct session_info* ss;
@@ -773,11 +805,12 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
 
             if (ss->mode == SS_MODE_CALLED)
             {
+                sip_log("ERROR-ERROR! I am s called, why receive a OK pkt! spkt_p->body_sdp <%p> \n",spkt_p->body_sdp);
+#if 0
                 if(spkt_p->body_sdp)
                 {
                     ss->called.ip.s_addr = spkt_p->rtp_ip.s_addr;
                     ss->called.port = spkt_p->rtp_port;
-                    //ss->called.number =strdup(spkt_p->msg_hdr.to_number);
                     if(spkt_p->msg_hdr.remote_party_id_phone_number)
                     {
                     	strncpy(ss->called_group_number,ss->called.number,
@@ -797,6 +830,7 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
                     }
                     //strncpy(ss->called.number,spkt_p->msg_hdr.to_number,sizeof(ss->called.number));
                 }
+#endif
             }
             else if  (ss->mode ==SS_MODE_CALLING)
             {
@@ -805,24 +839,7 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
                 {
                     ss->called.ip.s_addr = spkt_p->rtp_ip.s_addr;
                     ss->called.port = spkt_p->rtp_port;
-                    if(spkt_p->msg_hdr.remote_party_id_phone_number)
-                    {
-                    /* 把原来的called number放到called_group_number里，这是被叫的组号。 */
-                    	strncpy(ss->called_group_number,ss->called.number,
-							sizeof(ss->called_group_number));
-                    	strncpy(ss->called.number,
-							spkt_p->msg_hdr.remote_party_id_phone_number,
-							sizeof(ss->called.number));
-                    }
-                    else
-					{
-					    if(spkt_p->msg_hdr.to_number)
-					    {
-                    	    strncpy(ss->called.number,
-                    		    spkt_p->msg_hdr.to_number,
-                    		    sizeof(ss->called.number));
-                        }
-                    }
+                    change_phone_number_for_ok(spkt_p,ss);
 					if(ss->rtp_sniffer_id == 0)
 					{
 
@@ -850,6 +867,17 @@ void _update_session_for_ok(struct sip_pkt* spkt_p)
         }
     }
 }
+void change_phone_number_for_ack(struct sip_pkt* spkt_p,struct session_info* ss)
+{
+    if(ss->is_star98)
+    {
+        sip_log("I am star98 ,I can't change calling-number  <%s> \n",ss->calling.number);
+        return;
+    }
+    sip_log("(callid %s) calling number <%s> to <%s> \n",ss->call_id,ss->calling.number,spkt_p->msg_hdr.from_number);
+    strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
+    return;
+}
 /*
 *98并席的过程，
 1.1 是 电话是主叫，CUCM是被叫。 （两个IP的port号相同） 本机电话YYYY call *98XXX.
@@ -874,7 +902,7 @@ void _update_session_for_ack(struct sip_pkt* spkt_p)
         {
 
             sip_log("I find the session (callid %s) \n",ss->call_id);
-            if (ss->mode == SS_MODE_CALLED && spkt_p->state == SS_ACK)
+            if (ss->mode == SS_MODE_CALLED)
             {
   //              ss->state = spkt_p->state;
                 get_session_start_time(spkt_p,ss);
@@ -882,13 +910,9 @@ void _update_session_for_ack(struct sip_pkt* spkt_p)
                 {
                     ss->calling.ip.s_addr = spkt_p->rtp_ip.s_addr;
                     ss->calling.port = spkt_p->rtp_port;
-
-                    strncpy(ss->calling.number,spkt_p->msg_hdr.from_number,sizeof(ss->calling.number));
-                    sip_log("I find the session (callid %s) calling number: %s \n",
-                            ss->call_id,ss->calling.number);
-
-                     if(ss->rtp_sniffer_id == 0)
-                     {
+                    change_phone_number_for_ack(spkt_p,ss);
+                    if(ss->rtp_sniffer_id == 0)
+                    {
                         sip_setup_rtp_sniffer(ss);
                     }
                     else
